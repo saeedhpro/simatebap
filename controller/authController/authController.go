@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gitlab.com/simateb-project/simateb-backend/constant"
 	"gitlab.com/simateb-project/simateb-backend/domain/auth"
+	"gitlab.com/simateb-project/simateb-backend/domain/wallet"
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
 	auth2 "gitlab.com/simateb-project/simateb-backend/utils/auth"
@@ -70,6 +71,7 @@ func createToken(user *auth.UserLoginInfo) (*auth.ResponseAccessToken, error) {
 		FirstName:      user.FirstName,
 		UserGroupID:    user.UserGroupID,
 		OrganizationID: user.OrganizationID,
+		Wallet: wallet.GetWallet(user.ID),
 	}
 	claims.ExpiresAt = time.Now().Unix() + constant.ExpTime
 	claims.Issuer = strconv.Itoa(int(user.ID))

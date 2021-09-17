@@ -35,6 +35,7 @@ func mysqlInit() {
 	}
 
 	if err := db.Ping(); err != nil {
+		log.Println(err.Error())
 		panic(err.Error())
 	}
 

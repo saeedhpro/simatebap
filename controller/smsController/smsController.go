@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	sms2 "gitlab.com/simateb-project/simateb-backend/domain/sms"
 	"gitlab.com/simateb-project/simateb-backend/repository"
-	"gitlab.com/simateb-project/simateb-backend/repository/SMS"
+	"gitlab.com/simateb-project/simateb-backend/repository/sms"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
 	"log"

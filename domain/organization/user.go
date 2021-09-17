@@ -49,19 +49,19 @@ type ChangeUserPasswordRequest struct {
 }
 
 type OrganizationUser struct {
-	ID               int64           `json:"id"`
-	FirstName        string          `json:"fname"`
-	LastName         string          `json:"lname"`
-	Tel              string          `json:"tel"`
-	UserGroupID      int64           `json:"user_group_id,omitempty"`
-	Created          helper.NullTime `json:"created,omitempty"`
-	LastLogin        helper.NullTime `json:"last_login,omitempty"`
-	BirthDate        helper.NullTime `json:"birth_date,omitempty"`
-	OrganizationID   string          `json:"organization_id,omitempty"`
-	OrganizationName string          `json:"organization_name,omitempty"`
-	UserGroupName    string          `json:"user_group_name,omitempty"`
-	Relation         string          `json:"relation,omitempty"`
-	Description      string          `json:"description,omitempty"`
+	ID               int64         `json:"id"`
+	FirstName        string        `json:"fname"`
+	LastName         string        `json:"lname"`
+	Tel              string        `json:"tel"`
+	UserGroupID      int           `json:"user_group_id"`
+	Created          *sql.NullTime `json:"created,omitempty"`
+	LastLogin        *sql.NullTime `json:"last_login,omitempty"`
+	BirthDate        *sql.NullTime `json:"birth_date,omitempty"`
+	OrganizationID   string        `json:"organization_id,omitempty"`
+	OrganizationName string        `json:"organization_name,omitempty"`
+	UserGroupName    string        `json:"user_group_name"`
+	Relation         string        `json:"relation,omitempty"`
+	Description      string        `json:"description,omitempty"`
 }
 
 type SimpleUserInfo struct {

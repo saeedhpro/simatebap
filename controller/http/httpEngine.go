@@ -8,6 +8,7 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/controller/caseTypeController"
 	HoldayController "gitlab.com/simateb-project/simateb-backend/controller/holidayController"
 	"gitlab.com/simateb-project/simateb-backend/controller/organizationController"
+	"gitlab.com/simateb-project/simateb-backend/controller/paymentController"
 	"gitlab.com/simateb-project/simateb-backend/controller/smsController"
 	"gitlab.com/simateb-project/simateb-backend/controller/userController"
 	"gitlab.com/simateb-project/simateb-backend/middleware"
@@ -39,6 +40,7 @@ func Run(Port string) {
 	ctc := caseTypeController.NewCaseTypeController(appr)
 	hc := HoldayController.NewHolidayController()
 	smsc := smsController.NewSMSController()
+	pc := paymentController.NewPaymentController()
 
 	{
 		v1.POST("/auth/login", ac.Login)
@@ -59,6 +61,17 @@ func Run(Port string) {
 		v1.PUT("/users/:id", middleware.GinJwtAuth(uc.Update, true, false))
 		v1.DELETE("/users/:id", middleware.GinJwtAuth(uc.Delete, true, false))
 		v1.PATCH("/users/:id/password", middleware.GinJwtAuth(uc.ChangePassword, true, false))
+		v1.GET("/users/:id/appointments", middleware.GinJwtAuth(uc.GetUserAppointmentList, true, false))
+		v1.GET("/users/:id/wallet", middleware.GinJwtAuth(uc.GetUserWallet, true, false))
+		v1.POST("/users/:id/wallet/increase", middleware.GinJwtAuth(uc.IncreaseUserWallet, true, false))
+		v1.POST("/users/:id/wallet/decrease", middleware.GinJwtAuth(uc.DecreaseUserWallet, true, false))
+		v1.GET("/users/:id/payments", middleware.GinJwtAuth(pc.GetPaymentList, true, false))
+	}
+
+	{
+		v1.POST("/payments", middleware.GinJwtAuth(pc.Create, true, false))
+		v1.PUT("/payments/:id", middleware.GinJwtAuth(pc.Update, true, false))
+		v1.DELETE("/payments/:id", middleware.GinJwtAuth(pc.Delete, true, false))
 	}
 
 	{
@@ -99,12 +112,14 @@ func Run(Port string) {
 
 	{
 		v1.GET("/admin/users", middleware.GinJwtAuth(uc.GetListForAdmin, true, false))
+		v1.GET("/admin/admins", middleware.GinJwtAuth(uc.GetAdminList, true, false))
 		v1.POST("/admin/users", middleware.GinJwtAuth(uc.Create, true, false))
 		v1.GET("/admin/users/:id", middleware.GinJwtAuth(uc.Get, true, false))
 		v1.PUT("/admin/users/:id", middleware.GinJwtAuth(uc.Update, true, false))
 		v1.DELETE("/admin/users/:id", middleware.GinJwtAuth(uc.Delete, true, false))
 		v1.PATCH("/admin/users/:id/password", middleware.GinJwtAuth(uc.ChangePassword, true, false))
-		v1.GET("/admin/users/:id/appointments", middleware.GinJwtAuth(uc.GetUserAppointmentList, true, false))
+		v1.POST("/admin/users/:id/wallet/increase", middleware.GinJwtAuth(uc.IncreaseUserWallet, true, false))
+		v1.POST("/admin/users/:id/wallet/decrease", middleware.GinJwtAuth(uc.DecreaseUserWallet, true, false))
 
 		v1.GET("/admin/holidays", middleware.GinJwtAuth(hc.GetListForAdmin, true, false))
 		v1.POST("/admin/holidays", middleware.GinJwtAuth(hc.Create, true, false))
