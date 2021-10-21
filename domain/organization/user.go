@@ -20,7 +20,7 @@ type CreateUserRequest struct {
 	Logo           string         `json:"logo"`
 	Tel1           string         `json:"tel1"`
 	Nid            string         `json:"nid"`
-	BirthDate      sql.NullTime   `json:"birth_date"`
+	BirthDate      string         `json:"birth_date"`
 	Address        string         `json:"address"`
 	Introducer     string         `json:"introducer"`
 	Password       string         `json:"password"`
@@ -54,14 +54,33 @@ type OrganizationUser struct {
 	LastName         string        `json:"lname"`
 	Tel              string        `json:"tel"`
 	UserGroupID      int           `json:"user_group_id"`
-	Created          *sql.NullTime `json:"created,omitempty"`
-	LastLogin        *sql.NullTime `json:"last_login,omitempty"`
-	BirthDate        *sql.NullTime `json:"birth_date,omitempty"`
-	OrganizationID   string        `json:"organization_id,omitempty"`
-	OrganizationName string        `json:"organization_name,omitempty"`
+	Created          *sql.NullTime `json:"created"`
+	LastLogin        *sql.NullTime `json:"last_login"`
+	BirthDate        *sql.NullTime `json:"birth_date"`
+	Birth            int           `json:"birth"`
+	OrganizationID   string        `json:"organization_id"`
+	OrganizationName string        `json:"organization_name"`
 	UserGroupName    string        `json:"user_group_name"`
-	Relation         string        `json:"relation,omitempty"`
-	Description      string        `json:"description,omitempty"`
+	Relation         string        `json:"relation"`
+	Description      string        `json:"description"`
+	Info             string        `json:"info"`
+	Tel1             string        `json:"tel1"`
+	Nid              string        `json:"nid"`
+	Address          string        `json:"address"`
+	Introducer       string        `json:"introducer"`
+	Gender           string        `json:"gender"`
+	FileID           string        `json:"file_id"`
+}
+
+type LastLoginUser struct {
+	ID               int64         `json:"id"`
+	UserFirstName        string        `json:"user_fname"`
+	UserLastName         string        `json:"user_lname"`
+	Tel              string        `json:"tel"`
+	LastLogin        *sql.NullTime `json:"last_login"`
+	OrganizationID   string        `json:"organization_id"`
+	OrganizationName string        `json:"organization_name"`
+	UserGroupName    string        `json:"user_group_name"`
 }
 
 type SimpleUserInfo struct {

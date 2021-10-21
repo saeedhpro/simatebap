@@ -19,4 +19,5 @@ type AppointmentPaginationInfo struct {
 	PrevPage    int                                 `json:"prev_page"`
 	Page        int                                 `json:"page"`
 	HasNextPage bool                                `json:"has_next_page"`
+	PageCount   bool                                `json:"page_count"`
 }

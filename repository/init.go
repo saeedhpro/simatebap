@@ -9,12 +9,12 @@ import (
 
 var (
 	DBS  dbs
-	host = "simatebdb:3306"
-	//host     = "localhost:3306"
-	schema = "simateb"
-	//schema   = "newsimateb"
-	password = "hkTM4BO2Agra9tKQdSyETveN"
-	//password = ""
+	//host = "simatebdb:3306"
+	host     = "localhost:3306"
+	//schema = "simateb"
+	schema   = "newsimateb"
+	//password = "hkTM4BO2Agra9tKQdSyETveN"
+	password = ""
 	username = "root"
 )
 

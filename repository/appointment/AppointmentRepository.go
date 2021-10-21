@@ -25,11 +25,9 @@ func NewAppointmentRepository() *AppointmentRepositoryStruct {
 
 func (uc *AppointmentRepositoryStruct) LoadQueWithOrganization(organizationID int64, startDate string, endDate string, status string, user *auth.UserClaims) []appointment.SimpleAppointmentInfo {
 	query := fmt.Sprintf("SELECT appointment.id, appointment.start_at, user.fname user_fname, user.lname user_lname, user.gender user_gender, user.id user_id, user.tel mobile, appointment.status, appointment.case_type, ct.duration duration, appointment.is_vip FROM appointment LEFT JOIN user ON appointment.user_id = user.id LEFT JOIN case_type ct on ct.organization_id = appointment.organization_id AND ct.name = appointment.case_type WHERE `status` IN (%s) AND  DATE(appointment.start_at) >= DATE(\"%s\") AND DATE(appointment.start_at) <= DATE(\"%s\") AND appointment.organization_id = ? ORDER BY appointment.start_at ASC", status, startDate, endDate)
-	log.Println(query)
-	log.Println(organizationID)
 	var values []interface{}
 	values = append(values, organizationID)
-	var appointments []appointment.SimpleAppointmentInfo
+	appointments := []appointment.SimpleAppointmentInfo{}
 	var appointment appointment.SimpleAppointmentInfo
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
@@ -42,7 +40,6 @@ func (uc *AppointmentRepositoryStruct) LoadQueWithOrganization(organizationID in
 		return appointments
 	}
 	for rows.Next() {
-		log.Println("appointment")
 		err = rows.Scan(
 			&appointment.ID,
 			&appointment.StartAt,
@@ -78,7 +75,7 @@ func (uc *AppointmentRepositoryStruct) LoadTotals(organizationID int64, startDat
 
 	var values []interface{}
 	values = append(values, organizationID, startDate, endDate)
-	var totals []appointment.TotalLimit
+	totals := []appointment.TotalLimit{}
 	var total appointment.TotalLimit
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
@@ -112,7 +109,7 @@ func (uc *AppointmentRepositoryStruct) LoadTotalsByDayAndCase(organizationID int
 
 	var values []interface{}
 	values = append(values, organizationID, caseType, startDate, endDate)
-	var totals []appointment.TotalLimit
+	totals := []appointment.TotalLimit{}
 	var total appointment.TotalLimit
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
@@ -132,18 +129,18 @@ func (uc *AppointmentRepositoryStruct) LoadTotalsByDayAndCase(organizationID int
 	return totals
 }
 
-func (uc *AppointmentRepositoryStruct) GetOrganizationWorkHour(organizationId int64) appointment.WorkHour {
+func (uc *AppointmentRepositoryStruct) GetOrganizationWorkHour(organizationId int64) *appointment.WorkHour {
 	query := "SELECT work_hour_start start, work_hour_end end FROM organization WHERE organization_id = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	var workHour appointment.WorkHour
 	if err != nil {
-		return workHour
+		return nil
 	}
 	result := stmt.QueryRow(organizationId)
 	result.Scan(
 		&workHour.Start,
 		&workHour.End,
 	)
-	return workHour
+	return &workHour
 }
 

@@ -109,26 +109,34 @@ func (uc *HolidayControllerStruct) GetList(c *gin.Context) {
 	}
 	startAtDate := fmt.Sprintf("%s 00:00:00", startAt)
 	endAtDate := fmt.Sprintf("%s 00:00:00", endAt)
-	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.GetOrganizationHolidaysQuery)
+	GetOrganizationHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name,'') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id WHERE holiday.organization_id = ? AND DATE(holiday.hdate) between ? AND ? ORDER BY hdate ASC"
+	stmt, err := repository.DBS.MysqlDb.Prepare(GetOrganizationHolidaysQuery)
 	if err != nil {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	var holidays []holiday.HolidayInfo
+	holidays := []holiday.HolidayInfo{}
 	var holiday holiday.HolidayInfo
 	user := auth.GetStaffUser(c)
 	var values []interface{}
 	values = append(values, user.OrganizationID, startAtDate, endAtDate)
-	rows, err := stmt.Query()
-	defer rows.Close()
+	rows, err := stmt.Query(values...)
 	if err != nil {
 		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
 	for rows.Next() {
-		rows.Scan(
+		err := rows.Scan(
 			&holiday.ID,
+			&holiday.Title,
+			&holiday.HDate,
+			&holiday.OrganizationID,
+			&holiday.OrganizationName,
 		)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		holidays = append(holidays, holiday)
 	}
 	c.JSON(http.StatusOK, holidays)
@@ -139,25 +147,31 @@ func (uc *HolidayControllerStruct) GetListForAdmin(c *gin.Context) {
 	if page == "" {
 		page = "1"
 	}
-	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.GetAdminHolidaysQuery)
+	GetAdminHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, organization.name organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id LIMIT 10 OFFSET ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(GetAdminHolidaysQuery)
 	if err != nil {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	var holidays []holiday.HolidayInfo
-	var holiday holiday.HolidayInfo
-	var values []interface{}
-	values = append(values, page)
-	rows, err := stmt.Query()
-	defer rows.Close()
+	rows, err := stmt.Query(page)
 	if err != nil {
 		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
+	holidays := []holiday.HolidayInfo{}
+	var holiday holiday.HolidayInfo
 	for rows.Next() {
-		rows.Scan(
+		err := rows.Scan(
 			&holiday.ID,
+			&holiday.Title,
+			&holiday.HDate,
+			&holiday.OrganizationID,
+			&holiday.OrganizationName,
 		)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		holidays = append(holidays, holiday)
 	}
 	c.JSON(http.StatusOK, holidays)

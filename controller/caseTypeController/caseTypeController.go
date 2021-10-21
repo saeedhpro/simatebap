@@ -143,6 +143,7 @@ func (uc *CaseTypeControllerStruct) Update(c *gin.Context) {
 	var columns []string
 	caseId := c.Param("id")
 	if caseId == "" {
+		log.Println(caseId, "case id")
 		errorsHandler.GinErrorResponseHandler(c, nil)
 		return
 	}
@@ -158,6 +159,7 @@ func (uc *CaseTypeControllerStruct) Update(c *gin.Context) {
 	updateUserQuery += " WHERE `id` = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(updateUserQuery)
 	if err != nil {
+		log.Println(err.Error(), "prepare")
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}

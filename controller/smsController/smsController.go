@@ -51,7 +51,7 @@ func (uc *SMSControllerStruct) Get(c *gin.Context) {
 }
 
 func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
-	query := "SELECT s.id id, s.fname user_fname, s.lname user_lname, s.user_id user_id, s.number, s.msg, s.created, s.sent, s.staff_fname, s.staff_lname FROM (SELECT c.id, user.fname staff_fname, user.lname staff_lname, c.fname, c.lname, c.user_id, c.number, c.msg, c.created, c.sent from (SELECT sms.id id, sms.user_id, sms.staff_id, sms.number, sms.msg, sms.sent, sms.created, user.fname , user.lname  from sms LEFT join user on sms.user_id = user.id ) c left join user on c.staff_id = user.id) s "
+	query := "SELECT s.id id, ifnull(s.fname, '') user_fname, ifnull(s.lname, '') user_lname, ifnull(s.user_id, 0) user_id, s.number, ifnull(s.msg, '') msg, s.created, s.sent, ifnull(s.staff_fname, '') staff_fname, ifnull(s.staff_lname, '') staff_lname FROM (SELECT c.id, user.fname staff_fname, user.lname staff_lname, c.fname, c.lname, c.user_id, c.number, c.msg, c.created, c.sent from (SELECT sms.id id, sms.user_id, sms.staff_id, sms.number, sms.msg, sms.sent, sms.created, user.fname , user.lname  from sms LEFT join user on sms.user_id = user.id ) c left join user on c.staff_id = user.id) s "
 	page := c.Query("page")
 	if page == "" {
 		page = "1"
@@ -62,9 +62,10 @@ func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
-	query += " offset ? limit 10"
+	query += " limit 10 offset ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
+		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
@@ -77,7 +78,7 @@ func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
 		return
 	}
 	for rows.Next() {
-		rows.Scan(
+		err = rows.Scan(
 			&SMS.ID,
 			&SMS.UserFname,
 			&SMS.UserLname,
@@ -89,13 +90,16 @@ func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
 			&SMS.StaffFname,
 			&SMS.StaffLname,
 		)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		SMSList = append(SMSList, SMS)
 	}
 	c.JSON(http.StatusOK, SMSList)
 }
 
 func (uc *SMSControllerStruct) GetList(c *gin.Context) {
-	query := "SELECT s.id id, s.fname user_fname, s.lname user_lname, s.user_id user_id, s.number, s.msg, s.created, s.sent, s.staff_fname, s.staff_lname FROM (SELECT c.id, user.fname staff_fname, user.lname staff_lname, c.fname, c.lname, c.user_id, c.number, c.msg, c.created, c.sent, user.organization_id organization_id from (SELECT sms.id id, sms.user_id, sms.staff_id, sms.number, sms.msg, sms.sent, sms.created, user.fname , user.lname, user.organization_id organization_id from sms LEFT join user on sms.user_id = user.id ) c left join user on c.staff_id = user.id) s WHERE s.organization_id = ? "
+	query := "SELECT s.id id, ifnull(s.fname, '') user_fname, ifnull(s.lname, '') user_lname, s.user_id user_id, s.number, ifnull(s.msg, '') msg, s.created, s.sent, ifnull(s.staff_fname, '') staff_fname, ifnull(s.staff_lname, '') staff_lname FROM (SELECT c.id, user.fname staff_fname, user.lname staff_lname, c.fname, c.lname, c.user_id, c.number, c.msg, c.created, c.sent, user.organization_id organization_id from (SELECT sms.id id, sms.user_id, sms.staff_id, sms.number, sms.msg, sms.sent, sms.created, user.fname , user.lname, user.organization_id organization_id from sms LEFT join user on sms.user_id = user.id ) c left join user on c.staff_id = user.id) s WHERE s.organization_id = ? "
 	page := c.Query("page")
 	if page == "" {
 		page = "1"
@@ -106,14 +110,15 @@ func (uc *SMSControllerStruct) GetList(c *gin.Context) {
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
-	query += " offset ? limit 10"
+	query += " LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
+		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
 	staff := auth.GetStaffUser(c)
-	var SMSList []sms2.SMS
+	SMSList := []sms2.SMS{}
 	var SMS sms2.SMS
 	rows, err := stmt.Query(staff.OrganizationID, offset)
 	defer rows.Close()
@@ -122,7 +127,7 @@ func (uc *SMSControllerStruct) GetList(c *gin.Context) {
 		return
 	}
 	for rows.Next() {
-		rows.Scan(
+		err := rows.Scan(
 			&SMS.ID,
 			&SMS.UserFname,
 			&SMS.UserLname,
@@ -134,6 +139,9 @@ func (uc *SMSControllerStruct) GetList(c *gin.Context) {
 			&SMS.StaffFname,
 			&SMS.StaffLname,
 		)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		SMSList = append(SMSList, SMS)
 	}
 	c.JSON(http.StatusOK, SMSList)

@@ -36,6 +36,6 @@ func GetStaffUser(c *gin.Context) *UserClaims {
 		return nil
 	}
 	c2 := resp.(UserClaims)
-	c2.Wallet = wallet.GetWallet(c2.UserID)
+	c2.Wallet = wallet.GetWallet(c2.UserID, "user")
 	return &c2
 }

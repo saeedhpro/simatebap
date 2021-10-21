@@ -2,6 +2,7 @@ package appointment
 
 import (
 	"database/sql"
+	"gitlab.com/simateb-project/simateb-backend/domain/organization"
 	"time"
 )
 
@@ -43,6 +44,7 @@ type SimpleAppointmentInfo struct {
 	Info       string       `json:"info"`
 	Income     float64      `json:"income"`
 	FileID     string       `json:"file_id"`
+	Price      float64      `json:"price"`
 	UpdatedAt  sql.NullTime `json:"updated_at"`
 }
 
@@ -88,15 +90,18 @@ type UserAppointmentInfo struct {
 	IsVip              bool          `json:"is_vip"`
 	VipIntroducer      int64         `json:"vip_introducer"`
 	Absence            int           `json:"absence"`
+	FileID             string        `json:"file_id,omitempty"`
+	Price              float64       `json:"price"`
 }
 
 type OperationInfo struct {
-	ID       int64        `json:"id"`
-	UserID   int64        `json:"user_id"`
-	StartAt  sql.NullTime `json:"start_at"`
-	Info     string       `json:"info"`
-	Income   float64      `json:"income"`
-	CaseType string       `json:"case_type"`
+	ID       int64                         `json:"id"`
+	UserID   int64                         `json:"user_id"`
+	User     *organization.OrganizationUser `json:"user"`
+	StartAt  sql.NullTime                  `json:"start_at"`
+	Info     string                        `json:"info"`
+	Income   float64                       `json:"income"`
+	CaseType string                        `json:"case_type"`
 }
 
 type QueDetail struct {
@@ -104,7 +109,7 @@ type QueDetail struct {
 	Limits          []Limit                 `json:"limits"`
 	Ques            []SimpleAppointmentInfo `json:"ques"`
 	Totals          []TotalLimit            `json:"totals"`
-	WorkHours       WorkHour                `json:"work_hours"`
+	WorkHours       *WorkHour               `json:"work_hours"`
 }
 
 type Limit struct {
@@ -122,4 +127,15 @@ type TotalLimit struct {
 type WorkHour struct {
 	Start string `json:"start"`
 	End   string `json:"end"`
+}
+
+type AcceptAppointmentRequest struct {
+	FuturePrescription string   `json:"future_prescription"`
+	Prescription       string   `json:"prescription"`
+	PhotographyCases   []string `json:"photography_cases"`
+	RadiologyCases     []string `json:"radiology_cases"`
+	PhotographyID      int64    `json:"photography_id"`
+	RadiologyID        int64    `json:"radiology_id"`
+	PhotographyMsg     int64    `json:"photography_msg"`
+	RadiologyMsg       int64    `json:"radiology_msg"`
 }

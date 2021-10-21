@@ -71,7 +71,7 @@ func createToken(user *auth.UserLoginInfo) (*auth.ResponseAccessToken, error) {
 		FirstName:      user.FirstName,
 		UserGroupID:    user.UserGroupID,
 		OrganizationID: user.OrganizationID,
-		Wallet: wallet.GetWallet(user.ID),
+		Wallet: wallet.GetWallet(user.ID, "user"),
 	}
 	claims.ExpiresAt = time.Now().Unix() + constant.ExpTime
 	claims.Issuer = strconv.Itoa(int(user.ID))

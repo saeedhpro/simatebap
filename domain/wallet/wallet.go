@@ -49,51 +49,64 @@ func (w *WalletStruct) User() (*WalletUserStruct, error) {
 	return &user, nil
 }
 
-func (w *WalletStruct) Increase(amount float64) bool {
+func (w *WalletStruct) Increase(amount float64) (bool, float64) {
 	query := "UPDATE `wallet` SET `balance`= ?  WHERE user_id = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
-		return false
+		return false, 0
 	}
 	newBalance := w.Balance + amount
 	_, err = stmt.Exec(newBalance, w.UserID)
 	if err != nil {
-		return false
+		return false, 0
 	}
-	return true
+	return true, newBalance
 }
 
-func (w *WalletStruct) Decrease(amount float64, force bool) bool {
+func (w *WalletStruct) Decrease(amount float64, force bool) (bool, float64) {
+	query := "UPDATE `wallet` SET `balance`= ?  WHERE user_id = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		return false, 0
+	}
+	if !force && w.Balance < amount {
+		return false, 0
+	}
+	newBalance := w.Balance - amount
+	_, err = stmt.Exec(newBalance, w.UserID)
+	if err != nil {
+		return false, 0
+	}
+	return true, newBalance
+}
+
+func (w *WalletStruct) SetBalance(amount float64) bool {
 	query := "UPDATE `wallet` SET `balance`= ?  WHERE user_id = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		return false
 	}
-	if !force && w.Balance < amount {
-		return false
-	}
-	newBalance := w.Balance - amount
-	_, err = stmt.Exec(newBalance, w.UserID)
+	_, err = stmt.Exec(amount, w.UserID)
 	if err != nil {
 		return false
 	}
 	return true
 }
 
-func (w *WalletStruct) Create() bool {
-	query := "INSERT INTO `wallet` (`user_id`, `balance`) VALUES (?,?)"
+func (w *WalletStruct) Create(t string) bool {
+	query := "INSERT INTO `wallet` (`user_id`, `balance`, `type`) VALUES (?,?,?)"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		return false
 	}
-	_, err = stmt.Exec(w.UserID, 0)
+	_, err = stmt.Exec(w.UserID, 0, t)
 	if err != nil {
 		return false
 	}
 	return true
 }
 
-func GetWallet(userID int64) *WalletStruct {
+func GetWallet(userID int64, t string) *WalletStruct {
 	wallet := WalletStruct{
 		UserID: userID,
 	}
@@ -103,12 +116,12 @@ func GetWallet(userID int64) *WalletStruct {
 		log.Println(err.Error())
 	}
 	if user != nil {
-		query := "SELECT COUNT(*) count FROM wallet WHERE user_id = ?"
+		query := "SELECT COUNT(*) count FROM wallet WHERE user_id = ? AND type = ?"
 		stmt, err := repository.DBS.MysqlDb.Prepare(query)
 		if err != nil {
 			return nil
 		}
-		result := stmt.QueryRow(userID)
+		result := stmt.QueryRow(userID, t)
 		err = result.Scan(
 			&count,
 		)
@@ -116,15 +129,15 @@ func GetWallet(userID int64) *WalletStruct {
 			return nil
 		}
 		if count == 0 {
-			wallet.Create()
+			wallet.Create(t)
 		}
 	}
-	query := "SElECT id, user_id, balance, created FROM wallet WHERE user_id = ?"
+	query := "SElECT id, user_id, balance, created FROM wallet WHERE user_id = ? AND type = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		return nil
 	}
-	result := stmt.QueryRow(userID)
+	result := stmt.QueryRow(userID, t)
 	err = result.Scan(
 		&wallet.ID,
 		&wallet.UserID,

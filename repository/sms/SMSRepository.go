@@ -7,12 +7,14 @@ import (
 	"log"
 )
 
-func SendSMS(sendSMSRequest sms.SendSMSRequest, staffID int64) (bool, error) {
+func SendSMS(sendSMSRequest sms.SendSMSRequest, staffID int64) (*string, error) {
 	var sent bool
+	sent, r := sendSMSRequest.SendSMS()
+	log.Println(sent)
 	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.CreateSMSQuery)
 	if err != nil {
 		log.Println(err.Error())
-		return false, err
+		return r, err
 	}
 	defer stmt.Close()
 	result, err := stmt.Exec(
@@ -26,14 +28,14 @@ func SendSMS(sendSMSRequest sms.SendSMSRequest, staffID int64) (bool, error) {
 	)
 	if err != nil {
 		log.Println(err.Error())
-		return false, err
+		return r, err
 	}
 	_, err = result.LastInsertId()
 	if err != nil {
 		log.Println(err.Error())
-		return false, err
+		return r, err
 	}
-	return true, nil
+	return nil, nil
 }
 
 func GetList(orgID int64) ([]sms.SMS, error) {

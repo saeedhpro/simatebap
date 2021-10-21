@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"gitlab.com/simateb-project/simateb-backend/domain/organization"
+	wallet2 "gitlab.com/simateb-project/simateb-backend/domain/wallet"
 	"gitlab.com/simateb-project/simateb-backend/helper"
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
@@ -24,6 +25,11 @@ type OrganizationControllerInterface interface {
 	GetList(c *gin.Context)
 	GetListForAdmin(c *gin.Context)
 	GetUsers(c *gin.Context)
+	GetOrganizationWallet(c *gin.Context)
+	IncreaseOrganizationWallet(c *gin.Context)
+	DecreaseOrganizationWallet(c *gin.Context)
+	SetOrganizationWallet(c *gin.Context)
+	GetOrganizationRelList(c *gin.Context)
 }
 
 type OrganizationControllerStruct struct {
@@ -181,7 +187,7 @@ func (oc *OrganizationControllerStruct) Get(c *gin.Context) {
 func (oc *OrganizationControllerStruct) GetList(c *gin.Context) {
 	var query = "SELECT id, ifnull(name, ''), ifnull(phone, ''), ifnull(phone1, ''), ifnull(profession_id, '')," +
 		" ifnull(known_as, ''), ifnull(case_types, ''), ifnull(staff_id, ''), ifnull(info, ''), ifnull(website, '')," +
-		" ifnull(instagram, ''), sms_price, sms_credit FROM organization "
+		" ifnull(instagram, ''), sms_price, sms_credit, created_at FROM organization "
 	var values []interface{}
 	userGroupID := c.Query("group")
 	q := c.Query("q")
@@ -208,10 +214,11 @@ func (oc *OrganizationControllerStruct) GetList(c *gin.Context) {
 			}
 			values = append(values,userGroupID)
 		} else {
-			query += fmt.Sprintf(" AND profession_id != 2 AND profession_id != 3 ")
+			query += fmt.Sprintf(" WHERE profession_id != 2 AND profession_id != 3 ")
 		}
 	}
 	query += "LIMIT 10 OFFSET ?"
+	log.Println(query, 'q')
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error(), "log")
@@ -267,6 +274,7 @@ func (oc *OrganizationControllerStruct) GetList(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, paginated)
 }
+
 func (oc *OrganizationControllerStruct) GetListForAdmin(c *gin.Context) {
 	var query = "SELECT id, ifnull(name, ''), ifnull(phone, ''), ifnull(phone1, ''), ifnull(profession_id, '')," +
 		" ifnull(known_as, ''), ifnull(case_types, ''), ifnull(staff_id, ''), ifnull(info, ''), ifnull(website, '')," +
@@ -403,7 +411,7 @@ func (oc *OrganizationControllerStruct) GetUsers(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	var users []organization.OrganizationUser
+	users := []organization.OrganizationUser{}
 	var user organization.OrganizationUser
 	rows, err := stmt.Query(organizationID, userGroupID, offset)
 	defer rows.Close()
@@ -424,6 +432,7 @@ func (oc *OrganizationControllerStruct) GetUsers(c *gin.Context) {
 			&user.UserGroupName,
 			&user.OrganizationName,
 			&user.OrganizationID,
+			&user.FileID,
 		)
 		if err != nil {
 			log.Println(err.Error(), "user log")
@@ -432,6 +441,59 @@ func (oc *OrganizationControllerStruct) GetUsers(c *gin.Context) {
 		users = append(users, user)
 	}
 	c.JSON(http.StatusOK, users)
+}
+
+func (oc *OrganizationControllerStruct) GetOrganizationRelList(c *gin.Context) {
+	organizationID := c.Param("id")
+	professionID := c.Query("prof")
+	if organizationID == "" {
+		c.JSON(422, struct {
+			Message string `json:"message"`
+			Code    int    `json:"code"`
+		}{
+			Message: "فیلد id الزامی است",
+			Code:    422,
+		})
+		return
+	}
+	if professionID == "" {
+		c.JSON(422, struct {
+			Message string `json:"message"`
+			Code    int    `json:"code"`
+		}{
+			Message: "فیلد prof الزامی است",
+			Code:    422,
+		})
+		return
+	}
+	getOrganizationRelQuery := "SELECT `organization`.`id` id, `organization`.`name` organization_name FROM `organization` LEFT JOIN `rel_organization` ON `organization`.`id` = `rel_organization`.`rel_organization_id` WHERE `rel_organization`.`organization_id` = ? AND `organization`.`profession_id` = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(getOrganizationRelQuery)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	orgs := []organization.SimpleOrganizationInfo{}
+	var org organization.SimpleOrganizationInfo
+	rows, err := stmt.Query(organizationID, professionID)
+	defer rows.Close()
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+	for rows.Next() {
+		err := rows.Scan(
+			&org.ID,
+			&org.Name,
+		)
+		if err != nil {
+			log.Println(err.Error(), "Organization")
+			errorsHandler.GinErrorResponseHandler(c, err)
+			return
+		}
+		orgs = append(orgs, org)
+	}
+	c.JSON(http.StatusOK, orgs)
 }
 
 func (oc *OrganizationControllerStruct) Update(c *gin.Context) {
@@ -544,4 +606,99 @@ func GetGroup(id int64) *organization.UserGroup {
 		return nil
 	}
 	return &userGroup
+}
+
+
+func (oc *OrganizationControllerStruct) GetOrganizationWallet(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(500, gin.H{
+			"message": "آی دی صحیح نیست",
+		})
+		return
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+	wallet := wallet2.GetWallet(uID,"organization")
+	c.JSON(200, wallet)
+}
+
+func (oc *OrganizationControllerStruct) IncreaseOrganizationWallet(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		return
+	}
+	var request wallet2.ChangeUserWalletBalance
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, nil)
+		return
+	}
+	wallet := wallet2.GetWallet(uID, "organization")
+	result, balance := wallet.Increase(request.Amount)
+	if result {
+		c.JSON(200, balance)
+		return
+	}
+	c.JSON(500, nil)
+}
+
+func (oc *OrganizationControllerStruct) DecreaseOrganizationWallet(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		return
+	}
+	var request wallet2.ChangeUserWalletBalance
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, nil)
+		return
+	}
+	wallet := wallet2.GetWallet(uID, "organization")
+	result, balance := wallet.Decrease(request.Amount, false)
+	if result {
+		c.JSON(200, balance)
+		return
+	}
+	c.JSON(500, nil)
+}
+
+func (oc *OrganizationControllerStruct) SetOrganizationWallet(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		return
+	}
+	var request wallet2.ChangeUserWalletBalance
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, nil)
+		return
+	}
+	wallet := wallet2.GetWallet(uID, "organization")
+	result := wallet.SetBalance(request.Amount)
+	if result {
+		c.JSON(200, nil)
+		return
+	}
+	c.JSON(500, nil)
 }

@@ -116,7 +116,7 @@ func (pc *PaymentControllerStruct) GetPaymentList(c *gin.Context) {
 	if id == "" {
 		return
 	}
-	query := "SELECT payment.id id, user.id user_id, user.fname user_fname, user.lname user_name, ifnull(user.known_as, '') user_known_as, payment.income income, payment.amount amount, payment.paytype paytype, ifnull(payment.check_num, '') check_num, ifnull(payment.check_bank, '') check_bank, payment.check_date check_date, payment.check_status check_status, payment.created created FROM payment LEFT JOIN user ON payment.user_id = user.id WHERE payment.user_id = ?"
+	query := "SELECT payment.id id, user.id user_id, user.fname user_fname, user.lname user_name, ifnull(user.known_as, '') user_known_as, payment.income income, payment.amount amount, payment.paytype paytype, ifnull(payment.check_num, '') check_num, ifnull(payment.check_bank, '') check_bank, payment.check_date check_date, payment.check_status check_status, payment.created created, payment.paid_for paid_for, payment.trace_code trace_code FROM payment LEFT JOIN user ON payment.user_id = user.id WHERE payment.user_id = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error())
@@ -146,6 +146,8 @@ func (pc *PaymentControllerStruct) GetPaymentList(c *gin.Context) {
 			&payment.CheckDate,
 			&payment.CheckStatus,
 			&payment.Created,
+			&payment.PaidFor,
+			&payment.TraceCode,
 		)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
@@ -155,7 +157,28 @@ func (pc *PaymentControllerStruct) GetPaymentList(c *gin.Context) {
 		}
 		payments = append(payments, payment)
 	}
-	c.JSON(http.StatusOK, payments)
+	var total float64
+	query = "SELECT SUM(payment.amount) total FROM payment LEFT JOIN user ON payment.user_id = user.id WHERE payment.user_id = ?"
+	stmt, err = repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	result := stmt.QueryRow(id)
+	err = result.Scan(
+		&total,
+	)
+	if err != nil {
+		log.Println(err.Error(), "error")
+		errorsHandler.GinErrorResponseHandler(c, error)
+		return
+	}
+	paymentList := payment2.PaymentListStruct{
+		Payments:     payments,
+		TotalPayment: total,
+	}
+	c.JSON(http.StatusOK, paymentList)
 }
 
 func (pc *PaymentControllerStruct) Update(c *gin.Context) {

@@ -8,6 +8,11 @@ import (
 type PaymentInterface interface {
 }
 
+type PaymentListStruct struct {
+	Payments     []PaymentStruct `json:"payments"`
+	TotalPayment float64         `json:"total_payment"`
+}
+
 type PaymentStruct struct {
 	ID          int64         `json:"id"`
 	UserID      int64         `json:"user_id"`
@@ -22,6 +27,8 @@ type PaymentStruct struct {
 	CheckDate   *sql.NullTime `json:"check_date,omitempty"`
 	CheckStatus bool          `json:"check_status"`
 	Created     *sql.NullTime `json:"created"`
+	PaidFor     int           `json:"paid_for"`
+	TraceCode   string        `json:"trace_code,omitempty"`
 }
 
 type CreatePaymentStruct struct {
