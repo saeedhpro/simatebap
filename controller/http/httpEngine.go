@@ -68,6 +68,7 @@ func Run(Port string) {
 		v1.GET("/organizations/:id", middleware.GinJwtAuth(oc.Get, true, false))
 		v1.PUT("/organizations/:id", middleware.GinJwtAuth(oc.Update, true, false))
 		v1.GET("/organizations/:id/rels", middleware.GinJwtAuth(oc.GetOrganizationRelList, true, false))
+		v1.POST("/organizations/:id/slider", middleware.GinJwtAuth(oc.SetOrganizationSlider, true, false))
 		v1.GET("/organizations/:id/users", middleware.GinJwtAuth(oc.GetUsers, true, false))
 		v1.GET("/organizations/:id/wallet", middleware.GinJwtAuth(oc.GetOrganizationWallet, true, false))
 		v1.POST("/organizations/:id/wallet/increase", middleware.GinJwtAuth(oc.IncreaseOrganizationWallet, true, false))

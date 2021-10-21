@@ -40,6 +40,10 @@ type CreateOrganizationRequest struct {
 	RelDoctorOffices []RelOrganizationType `json:"rel_doctor_offices" binding:"required"`
 }
 
+type SetOrganizationSliderRequest struct {
+	Images []string `json:"images" binding:"required"`
+}
+
 type RelOrganizationType struct {
 	ID           int64 `json:"id"`
 	ProfessionID int64 `json:"profession_id"`

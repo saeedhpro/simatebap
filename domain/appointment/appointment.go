@@ -95,13 +95,13 @@ type UserAppointmentInfo struct {
 }
 
 type OperationInfo struct {
-	ID       int64                         `json:"id"`
-	UserID   int64                         `json:"user_id"`
+	ID       int64                          `json:"id"`
+	UserID   int64                          `json:"user_id"`
 	User     *organization.OrganizationUser `json:"user"`
-	StartAt  sql.NullTime                  `json:"start_at"`
-	Info     string                        `json:"info"`
-	Income   float64                       `json:"income"`
-	CaseType string                        `json:"case_type"`
+	StartAt  sql.NullTime                   `json:"start_at"`
+	Info     string                         `json:"info"`
+	Income   float64                        `json:"income"`
+	CaseType string                         `json:"case_type"`
 }
 
 type QueDetail struct {

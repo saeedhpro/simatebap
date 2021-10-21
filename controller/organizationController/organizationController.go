@@ -30,6 +30,7 @@ type OrganizationControllerInterface interface {
 	DecreaseOrganizationWallet(c *gin.Context)
 	SetOrganizationWallet(c *gin.Context)
 	GetOrganizationRelList(c *gin.Context)
+	SetOrganizationSlider(c *gin.Context)
 }
 
 type OrganizationControllerStruct struct {
@@ -212,7 +213,7 @@ func (oc *OrganizationControllerStruct) GetList(c *gin.Context) {
 			} else {
 				query += fmt.Sprintf(" WHERE profession_id = ? ")
 			}
-			values = append(values,userGroupID)
+			values = append(values, userGroupID)
 		} else {
 			query += fmt.Sprintf(" WHERE profession_id != 2 AND profession_id != 3 ")
 		}
@@ -608,7 +609,6 @@ func GetGroup(id int64) *organization.UserGroup {
 	return &userGroup
 }
 
-
 func (oc *OrganizationControllerStruct) GetOrganizationWallet(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
@@ -624,7 +624,7 @@ func (oc *OrganizationControllerStruct) GetOrganizationWallet(c *gin.Context) {
 		})
 		return
 	}
-	wallet := wallet2.GetWallet(uID,"organization")
+	wallet := wallet2.GetWallet(uID, "organization")
 	c.JSON(200, wallet)
 }
 
@@ -701,4 +701,38 @@ func (oc *OrganizationControllerStruct) SetOrganizationWallet(c *gin.Context) {
 		return
 	}
 	c.JSON(500, nil)
+}
+
+func (oc *OrganizationControllerStruct) SetOrganizationSlider(c *gin.Context) {
+	organizationID := c.Param("id")
+	if organizationID == "" {
+		return
+	}
+	var request organization.SetOrganizationSliderRequest
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	var values []interface{}
+	columns := []string{}
+	values = append(values, strings.Join(request.Images, ","))
+	columns = append(columns, "sliders")
+	columnsString := strings.Join(columns, ",")
+	var updateOrganizationQuery = "UPDATE `organization` SET"
+	updateOrganizationQuery += columnsString
+	updateOrganizationQuery += " WHERE `id` = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(updateOrganizationQuery)
+	if err != nil {
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	values = append(values, organizationID)
+	_, error := stmt.Exec(values...)
+	if error != nil {
+		log.Println(error.Error())
+		errorsHandler.GinErrorResponseHandler(c, error)
+		return
+	}
+	c.JSON(200, true)
 }

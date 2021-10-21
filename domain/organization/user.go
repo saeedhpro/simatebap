@@ -74,8 +74,8 @@ type OrganizationUser struct {
 
 type LastLoginUser struct {
 	ID               int64         `json:"id"`
-	UserFirstName        string        `json:"user_fname"`
-	UserLastName         string        `json:"user_lname"`
+	UserFirstName    string        `json:"user_fname"`
+	UserLastName     string        `json:"user_lname"`
 	Tel              string        `json:"tel"`
 	LastLogin        *sql.NullTime `json:"last_login"`
 	OrganizationID   string        `json:"organization_id"`
@@ -102,4 +102,10 @@ type LastLoginUserInfo struct {
 	Tel         string          `json:"tel"`
 	UserGroupID int64           `json:"user_group_id,omitempty"`
 	LastLogin   helper.NullTime `json:"last_login,omitempty"`
+}
+
+type OrganizationUserPaginate struct {
+	Data            []OrganizationUser `json:"data"`
+	HasNextPage     bool               `json:"has_next_page"`
+	HasPreviousPage bool               `json:"has_previous_page"`
 }

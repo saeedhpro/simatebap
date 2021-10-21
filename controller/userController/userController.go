@@ -87,6 +87,7 @@ func (uc *UserControllerStruct) Create(c *gin.Context) {
 		createUserRequest.Introducer,
 		createUserRequest.Password,
 		createUserRequest.Relation,
+		createUserRequest.Logo,
 	)
 	if err != nil {
 		log.Println(err.Error())
@@ -122,36 +123,43 @@ func (uc *UserControllerStruct) Get(c *gin.Context) {
 }
 
 func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
-	getUsersQuery := "SELECT user.id id, user.fname fname, user.lname lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (3,4) "
+	getUsersQuery := "SELECT user.id id, user.fname fname, user.lname lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (?)"
+	group := c.Query("group")
+	if group == "" {
+		group = "3,4"
+	}
 	page := c.Query("page")
 	if page == "" {
 		page = "1"
 	}
 	q := c.Query("q")
 	if q != "" {
-		getUsersQuery += " LIKE %" + q + "% "
+		getUsersQuery += " AND (user.fname LIKE '%" + q + "%' OR user.lname LIKE '%" + q + "%') "
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
-	getUsersQuery += " LIMIT 10 OFFSET ?"
+	getUsersQuery += " ORDER BY `user`.`last_login` DESC LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(getUsersQuery)
 	if err != nil {
+		log.Println(err.Error(), "users error")
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
 	staffUser := auth.GetStaffUser(c)
 	if staffUser == nil {
+		log.Println(err.Error(), "staff error")
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	var users []organization.OrganizationUser
+	users := []organization.OrganizationUser{}
 	var user organization.OrganizationUser
-	rows, err := stmt.Query(offset)
-	defer rows.Close()
+	rows, err := stmt.Query(group,offset)
 	if err != nil {
 		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
+	defer rows.Close()
 	for rows.Next() {
 		err = rows.Scan(
 			&user.ID,
@@ -171,7 +179,28 @@ func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
 		log.Println(err)
 		users = append(users, user)
 	}
-	c.JSON(http.StatusOK, users)
+	count := 0
+	getCountQuery := "SELECT COUNT('*') count FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (?) "
+	if q != "" {
+		getCountQuery += " AND (user.fname LIKE '%" + q + "%' OR user.lname LIKE '%" + q + "%') "
+	}
+	getCountQuery += " ORDER BY `user`.`last_login` DESC"
+	stmt, err = repository.DBS.MysqlDb.Prepare(getCountQuery)
+	if err != nil {
+		log.Println(err.Error(), "count error")
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	result := stmt.QueryRow(group)
+	result.Scan(&count)
+	p, _ := strconv.Atoi(page)
+	log.Println(count > (p * 10))
+	paginate := organization.OrganizationUserPaginate{
+		Data: users,
+		HasNextPage: count > 10 && count > (p * 10),
+		HasPreviousPage: count > 10 && p > 1,
+	}
+	c.JSON(http.StatusOK, paginate)
 }
 
 func (uc *UserControllerStruct) GetAdminList(c *gin.Context) {
