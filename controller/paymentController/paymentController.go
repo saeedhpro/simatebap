@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/gin-gonic/gin"
 	payment2 "gitlab.com/simateb-project/simateb-backend/domain/payment"
+	sms2 "gitlab.com/simateb-project/simateb-backend/domain/sms"
 	"gitlab.com/simateb-project/simateb-backend/helper"
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
@@ -14,6 +15,7 @@ import (
 
 type PaymentControllerInterface interface {
 	Create(c *gin.Context)
+	DeleteItems(c *gin.Context)
 	Get(c *gin.Context)
 	GetPaymentList(c *gin.Context)
 	Update(c *gin.Context)
@@ -53,7 +55,7 @@ func (pc *PaymentControllerStruct) Create(c *gin.Context) {
 		&request.TraceCode,
 		&request.CheckNum,
 		&request.CheckBank,
-		&request.CheckDate.Time,
+		&request.CheckDate,
 		&request.Info,
 		&request.PaidTo,
 	)
@@ -69,6 +71,46 @@ func (pc *PaymentControllerStruct) Create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, true)
+}
+
+func (pc *PaymentControllerStruct) DeleteItems(c *gin.Context) {
+	query := "DELETE FROM `payment` WHERE id in ("
+	var deleteSMSRequest sms2.DeleteSMSRequest
+	if errors := c.ShouldBindJSON(&deleteSMSRequest); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	if len(deleteSMSRequest.IDs) == 0 {
+		c.JSON(http.StatusOK, nil)
+		return
+	}
+	var values []interface{}
+	for i := 0; i < len(deleteSMSRequest.IDs); i++ {
+		values = append(values, deleteSMSRequest.IDs[i])
+		if i != len(deleteSMSRequest.IDs)-1 {
+			query += "?,"
+		} else {
+			query += "?"
+		}
+	}
+	query += ")"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	log.Println(query, "q")
+	_, err = stmt.Exec(
+		values...,
+	)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, nil)
 }
 
 func (pc *PaymentControllerStruct) Get(c *gin.Context) {
@@ -112,6 +154,76 @@ func (pc *PaymentControllerStruct) Get(c *gin.Context) {
 }
 
 func (pc *PaymentControllerStruct) GetPaymentList(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		return
+	}
+	query := "SELECT payment.id id, user.id user_id, user.fname user_fname, user.lname user_name, ifnull(user.known_as, '') user_known_as, payment.income income, payment.amount amount, payment.paytype paytype, ifnull(payment.check_num, '') check_num, ifnull(payment.check_bank, '') check_bank, payment.check_date check_date, payment.check_status check_status, payment.created created, payment.paid_for paid_for, payment.trace_code trace_code FROM payment LEFT JOIN user ON payment.user_id = user.id WHERE payment.user_id = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	rows, error := stmt.Query(id)
+	if error != nil {
+		log.Println(error.Error(), "error")
+		errorsHandler.GinErrorResponseHandler(c, error)
+		return
+	}
+	var payments []payment2.PaymentStruct
+	var payment payment2.PaymentStruct
+	for rows.Next() {
+		err = rows.Scan(
+			&payment.ID,
+			&payment.UserFName,
+			&payment.UserFName,
+			&payment.UserLName,
+			&payment.UserKnownAs,
+			&payment.Income,
+			&payment.Amount,
+			&payment.PayType,
+			&payment.CheckNum,
+			&payment.CheckBank,
+			&payment.CheckDate,
+			&payment.CheckStatus,
+			&payment.Created,
+			&payment.PaidFor,
+			&payment.TraceCode,
+		)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"data": err.Error(),
+			})
+			return
+		}
+		payments = append(payments, payment)
+	}
+	var total float64
+	query = "SELECT SUM(payment.amount) total FROM payment LEFT JOIN user ON payment.user_id = user.id WHERE payment.user_id = ?"
+	stmt, err = repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	result := stmt.QueryRow(id)
+	err = result.Scan(
+		&total,
+	)
+	if err != nil {
+		log.Println(err.Error(), "error")
+		errorsHandler.GinErrorResponseHandler(c, error)
+		return
+	}
+	paymentList := payment2.PaymentListStruct{
+		Payments:     payments,
+		TotalPayment: total,
+	}
+	c.JSON(http.StatusOK, paymentList)
+}
+
+func (pc *PaymentControllerStruct) GetOrthodonticsList(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		return

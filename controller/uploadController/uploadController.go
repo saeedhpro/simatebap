@@ -22,6 +22,8 @@ type UploadControllerInterface interface {
 	GetList(c *gin.Context)
 	Get(c *gin.Context)
 	GetUploadedFile(c *gin.Context)
+	GetUploadedOrgImage(c *gin.Context)
+	GetUploadedResultImage(c *gin.Context)
 }
 
 type UploadControllerStruct struct {
@@ -66,7 +68,7 @@ func (uc *UploadControllerStruct) UploadByMINIO(c *gin.Context) {
 func (uc *UploadControllerStruct) Upload(c *gin.Context) {
 	_, header, err := c.Request.FormFile("file")
 	if err != nil {
-		log.Println(err.Error())
+		log.Println(err.Error(), "read file")
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
@@ -90,6 +92,7 @@ func (uc *UploadControllerStruct) Upload(c *gin.Context) {
 	}
 	c.JSON(http.StatusAccepted, gin.H{
 		"name": fileName,
+		"id": staff.UserID,
 		"path": fmt.Sprintf("/images/%d/%s", staff.UserID, fileName),
 	})
 }
@@ -153,6 +156,25 @@ func (uc *UploadControllerStruct) GetUploadedFile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"name": name,
 		"path": path,
-		"url": fmt.Sprintf("%s/images/%s/%s", c.Request.Host, path, name),
+		"url": fmt.Sprintf("http://%s/images/%s/%s", c.Request.Host, path, name),
+	})
+}
+func (uc *UploadControllerStruct) GetUploadedOrgImage(c *gin.Context) {
+	path := c.Param("id")
+	name := c.Param("name")
+	c.JSON(http.StatusOK, gin.H{
+		"name": name,
+		"path": path,
+		"url": fmt.Sprintf("http://%s/images/organizations/%s/%s", c.Request.Host, path, name),
+	})
+}
+func (uc *UploadControllerStruct) GetUploadedResultImage(c *gin.Context) {
+	id := c.Param("id")
+	prof := c.Param("prof")
+	name := c.Param("name")
+	c.JSON(http.StatusOK, gin.H{
+		"name": name,
+		"id": id,
+		"url": fmt.Sprintf("http://%s/images/results/%s/%s/%s", c.Request.Host, id, prof, name),
 	})
 }

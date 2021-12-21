@@ -8,22 +8,27 @@ import (
 
 type CaseInfo struct {
 	ID         int64  `json:"id"`
-	Name       string `json:"name,omitempty"`
+	Name       string `json:"name"`
 	ParentId   int64  `json:"parent_id"`
 	ParentName int64  `json:"parent_name"`
-	IsMain     bool   `json:"is_main,omitempty"`
+	IsMain     bool   `json:"is_main"`
+}
+
+type ProfessionCaseInfo struct {
+	PhotographyCases string `json:"photography_cases"`
+	RadiologyCases   string  `json:"radiology_cases"`
 }
 
 type CreateCaseRequest struct {
-	Name     string `json:"name,omitempty"`
+	Name     string `json:"name"`
 	ParentId int64  `json:"parent_id"`
-	IsMain   bool   `json:"is_main,omitempty"`
+	IsMain   bool   `json:"is_main"`
 }
 
 type UpdateCaseRequest struct {
-	Name     string `json:"name,omitempty"`
+	Name     string `json:"name"`
 	ParentId int64  `json:"parent_id"`
-	IsMain   bool   `json:"is_main,omitempty"`
+	IsMain   bool   `json:"is_main"`
 }
 
 func GetCaseByName(name string) (*CaseInfo, error) {

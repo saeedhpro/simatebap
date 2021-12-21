@@ -1,8 +1,10 @@
 package authController
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gitlab.com/simateb-project/simateb-backend/constant"
+	"gitlab.com/simateb-project/simateb-backend/controller/organizationController"
 	"gitlab.com/simateb-project/simateb-backend/domain/auth"
 	"gitlab.com/simateb-project/simateb-backend/domain/wallet"
 	"gitlab.com/simateb-project/simateb-backend/repository"
@@ -47,7 +49,11 @@ func (a *AuthControllerStruct) Login(c *gin.Context) {
 		&userLoginInfo.LastName,
 		&userLoginInfo.Tel,
 		&userLoginInfo.UserGroupID,
-		&userLoginInfo.OrganizationID)
+		&userLoginInfo.OrganizationID,
+	)
+	if userLoginInfo.OrganizationID != 0 {
+		userLoginInfo.Profession = organizationController.GetProfession(fmt.Sprintf("%d", userLoginInfo.OrganizationID))
+	}
 	if err != nil {
 		log.Println(err.Error(), "scan")
 		errorsHandler.GinErrorResponseHandler(c, err)
@@ -71,7 +77,7 @@ func createToken(user *auth.UserLoginInfo) (*auth.ResponseAccessToken, error) {
 		FirstName:      user.FirstName,
 		UserGroupID:    user.UserGroupID,
 		OrganizationID: user.OrganizationID,
-		Wallet: wallet.GetWallet(user.ID, "user"),
+		Wallet:         wallet.GetWallet(user.ID, "user"),
 	}
 	claims.ExpiresAt = time.Now().Unix() + constant.ExpTime
 	claims.Issuer = strconv.Itoa(int(user.ID))

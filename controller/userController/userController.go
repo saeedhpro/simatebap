@@ -2,18 +2,25 @@ package userController
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	appointment2 "gitlab.com/simateb-project/simateb-backend/domain/appointment"
 	"gitlab.com/simateb-project/simateb-backend/domain/organization"
+	sms2 "gitlab.com/simateb-project/simateb-backend/domain/sms"
 	wallet2 "gitlab.com/simateb-project/simateb-backend/domain/wallet"
 	"gitlab.com/simateb-project/simateb-backend/helper"
 	"gitlab.com/simateb-project/simateb-backend/repository"
+	"gitlab.com/simateb-project/simateb-backend/repository/doc"
+	"gitlab.com/simateb-project/simateb-backend/repository/medicalHistory"
 	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
 	"gitlab.com/simateb-project/simateb-backend/repository/user"
+	"gitlab.com/simateb-project/simateb-backend/repository/wallet"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -21,15 +28,28 @@ import (
 
 type UserControllerInterface interface {
 	Create(c *gin.Context)
+	CreateUserWalletHistories(c *gin.Context)
+	Own(c *gin.Context)
 	Get(c *gin.Context)
 	GetList(c *gin.Context)
 	GetListForAdmin(c *gin.Context)
 	GetAdminList(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	DeleteItems(c *gin.Context)
+	CreateCode(c *gin.Context)
+	SendDoc(c *gin.Context)
+	DeleteDoc(c *gin.Context)
+	GetUserDocs(c *gin.Context)
 	ChangePassword(c *gin.Context)
 	GetUserAppointmentList(c *gin.Context)
+	GetUserAppointmentResultList(c *gin.Context)
+	GetOrthodonticsList(c *gin.Context)
+	CreateOrthodonticsList(c *gin.Context)
 	GetUserWallet(c *gin.Context)
+	GetUserWalletHistories(c *gin.Context)
+	GetUserWalletHistoriesSum(c *gin.Context)
+	GetUserWalletHistoriesDays(c *gin.Context)
 	IncreaseUserWallet(c *gin.Context)
 	DecreaseUserWallet(c *gin.Context)
 	SetUserWallet(c *gin.Context)
@@ -104,6 +124,32 @@ func (uc *UserControllerStruct) Create(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+func (uc *UserControllerStruct) CreateUserWalletHistories(c *gin.Context) {
+	var request user.CreateWithdrawRequest
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	staff := auth.GetStaffUser(c)
+	result, _ := user.CreateWithdraw(request, staff.UserID)
+	c.JSON(200, result)
+}
+
+func (uc *UserControllerStruct) Own(c *gin.Context) {
+	staff := auth.GetStaffUser(c)
+	var user, err = user.GetUserByID(staff.UserID)
+	if err != nil {
+		log.Println(err.Error())
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, "یافت نشد")
+			return
+		}
+		errorsHandler.GinErrorResponseHandler(c, err)
+	}
+	c.JSON(http.StatusOK, user)
+}
+
 func (uc *UserControllerStruct) Get(c *gin.Context) {
 	userId := c.Param("id")
 	if userId == "" {
@@ -123,22 +169,22 @@ func (uc *UserControllerStruct) Get(c *gin.Context) {
 }
 
 func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
-	getUsersQuery := "SELECT user.id id, user.fname fname, user.lname lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (?)"
+	getUsersQuery := "SELECT user.id id, ifnull(user.fname, '') fname, ifnull(user.lname, '') lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (?)"
 	group := c.Query("group")
 	if group == "" {
-		group = "3,4"
+		group = "1,2,3,4,5,6"
 	}
 	page := c.Query("page")
 	if page == "" {
 		page = "1"
 	}
 	q := c.Query("q")
-	if q != "" {
+	if q != "" && q != "null" && q != "undefined" {
 		getUsersQuery += " AND (user.fname LIKE '%" + q + "%' OR user.lname LIKE '%" + q + "%') "
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
-	getUsersQuery += " ORDER BY `user`.`last_login` DESC LIMIT 10 OFFSET ?"
+	getUsersQuery += " ORDER BY `user`.`id` DESC LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(getUsersQuery)
 	if err != nil {
 		log.Println(err.Error(), "users error")
@@ -153,7 +199,7 @@ func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
 	}
 	users := []organization.OrganizationUser{}
 	var user organization.OrganizationUser
-	rows, err := stmt.Query(group,offset)
+	rows, err := stmt.Query(group, offset)
 	if err != nil {
 		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
@@ -176,12 +222,14 @@ func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
 			&user.Relation,
 			&user.Description,
 		)
-		log.Println(err)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		users = append(users, user)
 	}
 	count := 0
 	getCountQuery := "SELECT COUNT('*') count FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (?) "
-	if q != "" {
+	if q != "" && q != "null" && q != "undefined" {
 		getCountQuery += " AND (user.fname LIKE '%" + q + "%' OR user.lname LIKE '%" + q + "%') "
 	}
 	getCountQuery += " ORDER BY `user`.`last_login` DESC"
@@ -194,13 +242,12 @@ func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
 	result := stmt.QueryRow(group)
 	result.Scan(&count)
 	p, _ := strconv.Atoi(page)
-	log.Println(count > (p * 10))
-	paginate := organization.OrganizationUserPaginate{
-		Data: users,
-		HasNextPage: count > 10 && count > (p * 10),
-		HasPreviousPage: count > 10 && p > 1,
+	paginated := organization.OrganizationUserPaginate{
+		Data:       users,
+		Page:       p,
+		PagesCount: count,
 	}
-	c.JSON(http.StatusOK, paginate)
+	c.JSON(http.StatusOK, paginated)
 }
 
 func (uc *UserControllerStruct) GetAdminList(c *gin.Context) {
@@ -210,11 +257,12 @@ func (uc *UserControllerStruct) GetAdminList(c *gin.Context) {
 		page = "1"
 	}
 	q := c.Query("q")
-	if q != "" {
-		getUsersQuery += " LIKE %" + q + "% "
+	if q != "" && q != "null" && q != "undefined" {
+		getUsersQuery += " LIKE '%" + q + "%' "
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
+	getUsersQuery += " ORDER BY id DESC"
 	getUsersQuery += " LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(getUsersQuery)
 	if err != nil {
@@ -246,7 +294,9 @@ func (uc *UserControllerStruct) GetAdminList(c *gin.Context) {
 			&user.Relation,
 			&user.Description,
 		)
-		log.Println(err)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		users = append(users, user)
 	}
 	c.JSON(http.StatusOK, users)
@@ -259,11 +309,12 @@ func (uc *UserControllerStruct) GetList(c *gin.Context) {
 		page = "1"
 	}
 	q := c.Query("q")
-	if q != "" {
-		getUsersQuery += " LIKE %" + q + "% "
+	if q != "" && q != "null" && q != "undefined" {
+		getUsersQuery += " LIKE '%" + q + "%' "
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
+	getUsersQuery += " ORDER BY id DESC"
 	getUsersQuery += " LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(getUsersQuery)
 	if err != nil {
@@ -303,10 +354,34 @@ func (uc *UserControllerStruct) GetList(c *gin.Context) {
 			year, _, _, _, _, _ := helper.TimeDiff(user.BirthDate.Time, time.Now())
 			user.Birth = year
 		}
-		log.Println(err)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		users = append(users, user)
 	}
-	c.JSON(http.StatusOK, users)
+	count := 0
+	getCountQuery := "SELECT COUNT('*') count FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.organization_id = ? AND user.user_group_id != 2 "
+	if q != "" && q != "null" && q != "undefined" {
+		getCountQuery += " LIKE '%" + q + "%' "
+	}
+	stmt, err = repository.DBS.MysqlDb.Prepare(getCountQuery)
+	if err != nil {
+		log.Println(err.Error(), "count error")
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	result := stmt.QueryRow(staffUser.OrganizationID)
+	err = result.Scan(&count)
+	if err != nil {
+		log.Println(err.Error(), "err")
+	}
+	p, _ := strconv.Atoi(page)
+	paginated := organization.OrganizationUserPaginate{
+		Data:       users,
+		Page:       p,
+		PagesCount: count,
+	}
+	c.JSON(http.StatusOK, paginated)
 }
 
 func (uc *UserControllerStruct) GetLastLoginUsers(c *gin.Context) {
@@ -338,7 +413,9 @@ func (uc *UserControllerStruct) GetLastLoginUsers(c *gin.Context) {
 			&user.LastLogin,
 			&user.UserGroupName,
 		)
-		log.Println(err)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		users = append(users, user)
 	}
 	c.JSON(http.StatusOK, users)
@@ -373,14 +450,16 @@ func (uc *UserControllerStruct) GetLastLoginPatients(c *gin.Context) {
 			&user.OrganizationID,
 			&user.OrganizationName,
 		)
-		log.Println(err)
+		if err != nil {
+			log.Println(err.Error())
+		}
 		users = append(users, user)
 	}
 	c.JSON(http.StatusOK, users)
 }
 
 func (uc *UserControllerStruct) GetUserAppointmentList(c *gin.Context) {
-	getUserAppointmentListQuery := "SELECT id, user_id, created_at, ifnull(info, '') info, staff_id, start_at, end_at, status, ifnull(director_id, -1) director_id, updated_at, income, ifnull(subject, '') subject, ifnull(case_type, '') case_type, ifnull(laboratory_cases, '') laboratory_cases, ifnull(photography_cases, '') photography_cases, ifnull(radiology_cases, '') radiology_cases, ifnull(prescription, '') prescription, ifnull(future_prescription, '') future_prescription, ifnull(laboratory_msg, '') laboratory_msg, ifnull(photography_msg, '') photography_msg, ifnull(radiology_msg, '') radiology_msg, organization_id, ifnull(director_id, -1) laboratory_id, ifnull(photography_id, -1) photography_id, ifnull(radiology_id, -1) radiology_id, l_admission_at, r_admission_at, p_admission_at, l_result_at, r_result_at, p_result_at, ifnull(l_rnd_img, '') l_rnd_img, ifnull(r_rnd_img, '') r_rnd_img, ifnull(p_rnd_img, '') p_rnd_img, l_imgs, r_imgs, p_imgs, ifnull(code, '') code, is_vip, vip_introducer, absence, ifnull(file_id, '') file_id FROM appointment WHERE organization_id = ? AND user_id = ?"
+	getUserAppointmentListQuery := "SELECT id, user_id, created_at, ifnull(info, '') info, staff_id, start_at, end_at, status, ifnull(director_id, -1) director_id, updated_at, income, ifnull(subject, '') subject, ifnull(case_type, '') case_type, ifnull(laboratory_cases, '') laboratory_cases, ifnull(photography_cases, '') photography_cases, ifnull(radiology_cases, '') radiology_cases, ifnull(prescription, '') prescription, ifnull(future_prescription, '') future_prescription, ifnull(laboratory_msg, '') laboratory_msg, ifnull(photography_msg, '') photography_msg, ifnull(radiology_msg, '') radiology_msg, organization_id, ifnull(director_id, -1) laboratory_id, ifnull(photography_id, -1) photography_id, ifnull(radiology_id, -1) radiology_id, l_admission_at, r_admission_at, p_admission_at, l_result_at, r_result_at, p_result_at, ifnull(l_rnd_img, '') l_rnd_img, ifnull(r_rnd_img, '') r_rnd_img, ifnull(p_rnd_img, '') p_rnd_img, l_imgs, r_imgs, p_imgs, ifnull(code, '') code, is_vip, ifnull(vip_introducer, 0) vip_introducer, absence, ifnull(file_id, '') file_id FROM appointment WHERE organization_id = ? AND user_id = ?"
 	userID := c.Param("id")
 	stmt, err := repository.DBS.MysqlDb.Prepare(getUserAppointmentListQuery)
 	if err != nil {
@@ -446,10 +525,146 @@ func (uc *UserControllerStruct) GetUserAppointmentList(c *gin.Context) {
 			&appointment.Absence,
 			&appointment.FileID,
 		)
-		log.Println(err.Error(), "err")
+		if err != nil {
+			log.Println(err.Error(), "err")
+			c.JSON(http.StatusOK, appointments)
+			return
+		}
 		appointments = append(appointments, appointment)
 	}
 	c.JSON(http.StatusOK, appointments)
+}
+
+func (uc *UserControllerStruct) GetUserAppointmentResultList(c *gin.Context) {
+	query := "SELECT id, user_id, created_at, ifnull(info, '') info, staff_id, start_at, end_at, status, ifnull(director_id, -1) director_id, updated_at, income, ifnull(subject, '') subject, ifnull(case_type, '') case_type, ifnull(laboratory_cases, '') laboratory_cases, ifnull(photography_cases, '') photography_cases, ifnull(radiology_cases, '') radiology_cases, ifnull(prescription, '') prescription, ifnull(future_prescription, '') future_prescription, ifnull(laboratory_msg, '') laboratory_msg, ifnull(photography_msg, '') photography_msg, ifnull(radiology_msg, '') radiology_msg, organization_id, ifnull(director_id, -1) laboratory_id, ifnull(photography_id, -1) photography_id, ifnull(radiology_id, -1) radiology_id, l_admission_at, r_admission_at, p_admission_at, l_result_at, r_result_at, p_result_at, ifnull(l_rnd_img, '') l_rnd_img, ifnull(r_rnd_img, '') r_rnd_img, ifnull(p_rnd_img, '') p_rnd_img, l_imgs, r_imgs, p_imgs, ifnull(code, '') code, is_vip, ifnull(vip_introducer, 0) vip_introducer, absence, ifnull(file_id, '') file_id FROM appointment WHERE organization_id = ? AND user_id = ? "
+	userID := c.Param("id")
+	appointments := []appointment2.UserAppointmentInfo{}
+	var appointment appointment2.UserAppointmentInfo
+	staffUser := auth.GetStaffUser(c)
+	prof := c.Query("prof")
+	if prof == "photo" {
+		query += "OR photography_id = ? AND p_result_at IS NOT NULL "
+	}
+	if prof == "lab" {
+		query += "OR labratory_id = ? AND l_result_at IS NOT NULL "
+	}
+	if prof == "radio" {
+		query += "OR radiology_id = ? AND r_result_at IS NOT NULL "
+	}
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "prepare")
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	rows, err := stmt.Query(staffUser.OrganizationID, userID, staffUser.OrganizationID)
+	defer rows.Close()
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+	for rows.Next() {
+		err = rows.Scan(
+			&appointment.ID,
+			&appointment.UserID,
+			&appointment.CreatedAt,
+			&appointment.Info,
+			&appointment.StaffID,
+			&appointment.StartAt,
+			&appointment.EndAt,
+			&appointment.Status,
+			&appointment.DirectorID,
+			&appointment.UpdatedAt,
+			&appointment.Income,
+			&appointment.Subject,
+			&appointment.CaseType,
+			&appointment.LaboratoryCases,
+			&appointment.PhotographyCases,
+			&appointment.RadiologyCases,
+			&appointment.Prescription,
+			&appointment.FuturePrescription,
+			&appointment.LaboratoryMsg,
+			&appointment.PhotographyMsg,
+			&appointment.RadiologyMsg,
+			&appointment.OrganizationID,
+			&appointment.LaboratoryID,
+			&appointment.PhotographyID,
+			&appointment.RadiologyID,
+			&appointment.LAdmissionAt,
+			&appointment.RAdmissionAt,
+			&appointment.PAdmissionAt,
+			&appointment.LResultAt,
+			&appointment.RResultAt,
+			&appointment.PResultAt,
+			&appointment.LRndImg,
+			&appointment.RRndImg,
+			&appointment.PRndImg,
+			&appointment.LImgs,
+			&appointment.RImgs,
+			&appointment.PImgs,
+			&appointment.Code,
+			&appointment.IsVip,
+			&appointment.VipIntroducer,
+			&appointment.Absence,
+			&appointment.FileID,
+		)
+		if err != nil {
+			log.Println(err.Error(), "err")
+			c.JSON(http.StatusOK, appointments)
+			return
+		}
+		appointment.Logos = GetResultImages(appointment.ID, prof, c.Request.Host)
+		if len(appointment.Logos) > 0 {
+			appointments = append(appointments, appointment)
+		}
+	}
+	c.JSON(http.StatusOK, appointments)
+}
+func GetResultImages(id int64, prof string, host string) []string {
+	logos := []string{}
+	location := fmt.Sprintf("./images/results/%d", id)
+	if _, err := os.Stat(location); os.IsNotExist(err) {
+		return logos
+	}
+	switch prof {
+	case "radio":
+		location += "/radio"
+		break
+	case "photo":
+		location += "/photo"
+		break
+	case "lab":
+		location += "/lab"
+		break
+	}
+	files, err := ioutil.ReadDir(location)
+	if err != nil {
+		log.Fatal(err, "system")
+		return logos
+	}
+	for _, f := range files {
+		if f.Name() != "." || f.Name() != ".." {
+			logos = append(logos, fmt.Sprintf("http://%s/images/results/%d/%s/%s", host, id, prof, f.Name()))
+		}
+	}
+	return logos
+}
+
+func (uc *UserControllerStruct) GetOrthodonticsList(c *gin.Context) {
+	userID := c.Param("id")
+	histories, _ := medicalHistory.GetMedicalHistory(userID)
+	c.JSON(http.StatusOK, histories)
+}
+
+func (uc *UserControllerStruct) CreateOrthodonticsList(c *gin.Context) {
+	var request medicalHistory.CreateMedicalHistoryStruct
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	res := medicalHistory.CreateMedicalHistory(request)
+	c.JSON(http.StatusOK, res)
 }
 
 func (uc *UserControllerStruct) Update(c *gin.Context) {
@@ -458,6 +673,7 @@ func (uc *UserControllerStruct) Update(c *gin.Context) {
 	var columns []string
 	userId := c.Param("id")
 	if userId == "" {
+		log.Println(userId, "userid")
 		errorsHandler.GinErrorResponseHandler(c, nil)
 		return
 	}
@@ -469,10 +685,16 @@ func (uc *UserControllerStruct) Update(c *gin.Context) {
 	}
 	getUserUpdateColumns(&updateUserRequest, &columns, &values)
 	columnsString := strings.Join(columns, ",")
+	if len(columnsString) == 0 {
+		c.JSON(422, false)
+		return
+	}
 	updateUserQuery += columnsString
+	log.Println(updateUserQuery, "update")
 	updateUserQuery += " WHERE `id` = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(updateUserQuery)
 	if err != nil {
+		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
@@ -509,7 +731,7 @@ func getUserUpdateColumns(o *organization.UpdateUserRequest, columns *[]string, 
 	}
 	if o.FileID != "" {
 		*columns = append(*columns, " `file_id` = ? ")
-		*values = append(*values, o.Info)
+		*values = append(*values, o.FileID)
 	}
 	if o.Email != "" {
 		*columns = append(*columns, " `email` = ? ")
@@ -559,6 +781,11 @@ func (uc *UserControllerStruct) Delete(c *gin.Context) {
 	if userID == "" {
 		return
 	}
+	//staff := auth.GetStaffUser(c)
+	//if staff.UserGroupID != 2 {
+	//	c.JSON(403, gin.H{})
+	//	return
+	//}
 	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.DeleteUserQuery)
 	if err != nil {
 		errorsHandler.GinErrorResponseHandler(c, err)
@@ -566,6 +793,112 @@ func (uc *UserControllerStruct) Delete(c *gin.Context) {
 	}
 	stmt.QueryRow(userID)
 	c.JSON(200, nil)
+}
+
+func (uc *UserControllerStruct) DeleteItems(c *gin.Context) {
+	//staff := auth.GetStaffUser(c)
+	//if staff.UserGroupID != 2 {
+	//	c.JSON(403, gin.H{})
+	//	return
+	//}
+	query := "DELETE FROM `user` WHERE id in ("
+	var deleteSMSRequest sms2.DeleteSMSRequest
+	if errors := c.ShouldBindJSON(&deleteSMSRequest); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	if len(deleteSMSRequest.IDs) == 0 {
+		c.JSON(http.StatusOK, nil)
+		return
+	}
+	var values []interface{}
+	for i := 0; i < len(deleteSMSRequest.IDs); i++ {
+		values = append(values, deleteSMSRequest.IDs[i])
+		if i != len(deleteSMSRequest.IDs)-1 {
+			query += "?,"
+		} else {
+			query += "?"
+		}
+	}
+	query += ")"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	log.Println(query, "q")
+	_, err = stmt.Exec(
+		values...,
+	)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+func (uc *UserControllerStruct) CreateCode(c *gin.Context) {
+	var updateUserQuery = "UPDATE `user` SET `appcode` = ? WHERE `id` = ?"
+	id := c.Param("id")
+	if id == "" {
+		errorsHandler.GinErrorResponseHandler(c, nil)
+		return
+	}
+	stmt, err := repository.DBS.MysqlDb.Prepare(updateUserQuery)
+	if err != nil {
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	code := helper.RandomString(6)
+	_, err = stmt.Exec(code, id)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	c.JSON(200, code)
+}
+
+func (uc *UserControllerStruct) SendDoc(c *gin.Context) {
+	staff := auth.GetStaffUser(c)
+	request := doc.CreateDocStruct{}
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	oid, _ := strconv.ParseInt(fmt.Sprintf("%d", staff.OrganizationID), 10, 32)
+	userID := c.Param("id")
+	uid, _ := strconv.ParseInt(userID, 10, 32)
+	request.OrganizationID = oid
+	request.UserID = uid
+	err := doc.CreateUserDoc(request)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+func (uc *UserControllerStruct) DeleteDoc(c *gin.Context) {
+	id := c.Param("id")
+	err := doc.DeleteDoc(id)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+func (uc *UserControllerStruct) GetUserDocs(c *gin.Context) {
+	staff := auth.GetStaffUser(c)
+	userID := c.Param("id")
+	docs, _ := doc.GetUserDocs(userID, fmt.Sprintf("%d", staff.OrganizationID))
+	c.JSON(http.StatusOK, docs)
 }
 
 func (uc *UserControllerStruct) ChangePassword(c *gin.Context) {
@@ -612,6 +945,84 @@ func (uc *UserControllerStruct) GetUserWallet(c *gin.Context) {
 	}
 	wallet := wallet2.GetWallet(uID, "user")
 	c.JSON(200, wallet)
+}
+
+func (uc *UserControllerStruct) GetUserWalletHistories(c *gin.Context) {
+	userID := c.Param("id")
+	start_date := c.Query("start_date")
+	end_date := c.Query("end_date")
+	page := c.Query("page")
+	q := c.Query("q")
+	if userID == "" {
+		c.JSON(500, gin.H{
+			"message": "آی دی صحیح نیست",
+		})
+		return
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+	histories, _ := user.GetUserAllWalletHistories(uID, start_date, end_date, q, page)
+	c.JSON(200, histories)
+}
+
+func (uc *UserControllerStruct) GetUserWalletHistoriesSum(c *gin.Context) {
+	userID := c.Param("id")
+	start_date := c.Query("start_date")
+	end_date := c.Query("end_date")
+	if userID == "" {
+		c.JSON(500, gin.H{
+			"message": "آی دی صحیح نیست",
+		})
+		return
+	}
+	var sum int64
+	sum = 0
+	if start_date == "" || end_date == "" || start_date == "null" || end_date == "null" {
+		c.JSON(200, gin.H{
+			"date": sum,
+		})
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+	sum, _ = user.GetUserWalletHistoriesSum(uID, start_date, end_date)
+	c.JSON(200, sum)
+}
+
+func (uc *UserControllerStruct) GetUserWalletHistoriesDays(c *gin.Context) {
+	userID := c.Param("id")
+	start_date := c.Query("start_date")
+	end_date := c.Query("end_date")
+	if userID == "" {
+		c.JSON(500, gin.H{
+			"message": "آی دی صحیح نیست",
+		})
+		return
+	}
+	histories := []wallet.WalletHistoryStruct{}
+	if start_date == "" || end_date == "" || start_date == "null" || end_date == "null" {
+		c.JSON(200, gin.H{
+			"date": histories,
+		})
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+	histories, _ = user.GetUserWalletHistoriesDays(uID, start_date, end_date)
+	c.JSON(200, histories)
 }
 
 func (uc *UserControllerStruct) IncreaseUserWallet(c *gin.Context) {

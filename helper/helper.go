@@ -58,7 +58,7 @@ func RandomString(length int) string {
 }
 
 type Datetime struct {
-	time.Time
+	*time.Time
 }
 
 func (t *Datetime) UnmarshalJSON(input []byte) error {
@@ -68,7 +68,7 @@ func (t *Datetime) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	t.Time = newTime
+	t.Time = &newTime
 	return nil
 }
 

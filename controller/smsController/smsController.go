@@ -1,12 +1,14 @@
 package smsController
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	sms2 "gitlab.com/simateb-project/simateb-backend/domain/sms"
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	"gitlab.com/simateb-project/simateb-backend/repository/sms"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
+	"gitlab.com/simateb-project/simateb-backend/utils/pagination"
 	"log"
 	"net/http"
 	"strconv"
@@ -57,8 +59,8 @@ func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
 		page = "1"
 	}
 	q := c.Query("q")
-	if q != "" {
-		q = "WHERE (s.fname LIKE %" + q + "% OR s.lname LIKE %" + q + "% OR s.msg LIKE %" + q + "%)"
+	if q != "" && q != "null" && q != "undefined" {
+		query += " WHERE (s.fname LIKE '%" + q + "%' OR s.lname LIKE '%" + q + "%' OR s.msg LIKE '%" + q + "%')"
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
@@ -69,6 +71,7 @@ func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
+	paginationInfo := pagination.SMSPaginationInfo{}
 	var SMSList []sms2.SMS
 	var SMS sms2.SMS
 	rows, err := stmt.Query(offset)
@@ -95,7 +98,45 @@ func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
 		}
 		SMSList = append(SMSList, SMS)
 	}
-	c.JSON(http.StatusOK, SMSList)
+	paginationInfo.Data = SMSList
+	count := 0
+	p, _ := strconv.Atoi(page)
+	count, _ = getSMSCountAdmin(q)
+	paginationInfo.PagesCount = count
+	paginationInfo.Page = p
+	if p > 1 {
+		paginationInfo.PrevPage = p - 1
+	} else {
+		paginationInfo.PrevPage = p
+	}
+	if p < count/10 {
+		paginationInfo.NextPage = p
+	} else {
+		paginationInfo.NextPage = p + 1
+	}
+	paginationInfo.HasNextPage = (bool)(count > 10 && count > (p*10))
+	c.JSON(http.StatusOK, paginationInfo)
+}
+
+func getSMSCountAdmin(q string) (int, error) {
+	query := "SELECT COUNT(*) FROM (SELECT c.id, user.fname staff_fname, user.lname staff_lname, c.fname, c.lname, c.user_id, c.number, c.msg, c.created, c.sent from (SELECT sms.id id, sms.user_id, sms.staff_id, sms.number, sms.msg, sms.sent, sms.created, user.fname , user.lname  from sms LEFT join user on sms.user_id = user.id ) c left join user on c.staff_id = user.id) s "
+	var values []interface{}
+	count := 0
+	if q != "" && q != "null" && q != "undefined" {
+		query +="AND (s.fname LIKE '%" + q + "%' OR s.lname LIKE '%" + q + "%' OR s.msg LIKE '%" + q + "%')"
+	}
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		return count, nil
+	}
+	result := stmt.QueryRow(values...)
+	err = result.Scan(&count)
+	if err != nil {
+		log.Println(err.Error(), "count")
+		return count, nil
+	}
+	return count, nil
 }
 
 func (uc *SMSControllerStruct) GetList(c *gin.Context) {
@@ -105,8 +146,8 @@ func (uc *SMSControllerStruct) GetList(c *gin.Context) {
 		page = "1"
 	}
 	q := c.Query("q")
-	if q != "" {
-		q = "AND (s.fname LIKE %" + q + "% OR s.lname LIKE %" + q + "% OR s.msg LIKE %" + q + "%)"
+	if q != "" && q != "null" && q != "undefined" {
+		query += "AND (s.fname LIKE '%" + q + "%' OR s.lname LIKE '%" + q + "%' OR s.msg LIKE '%" + q + "%')"
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
@@ -120,10 +161,11 @@ func (uc *SMSControllerStruct) GetList(c *gin.Context) {
 	staff := auth.GetStaffUser(c)
 	SMSList := []sms2.SMS{}
 	var SMS sms2.SMS
+	paginationInfo := pagination.SMSPaginationInfo{}
 	rows, err := stmt.Query(staff.OrganizationID, offset)
-	defer rows.Close()
 	if err != nil {
 		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
 	for rows.Next() {
@@ -141,29 +183,83 @@ func (uc *SMSControllerStruct) GetList(c *gin.Context) {
 		)
 		if err != nil {
 			log.Println(err.Error())
+			c.JSON(http.StatusOK, paginationInfo)
+			return
 		}
 		SMSList = append(SMSList, SMS)
 	}
-	c.JSON(http.StatusOK, SMSList)
+	paginationInfo.Data = SMSList
+	count := 0
+	p, _ := strconv.Atoi(page)
+	count, _ = getSMSCount(fmt.Sprintf("%d", staff.OrganizationID), q)
+	paginationInfo.PagesCount = count
+	paginationInfo.Page = p
+	if p > 1 {
+		paginationInfo.PrevPage = p - 1
+	} else {
+		paginationInfo.PrevPage = p
+	}
+	if p < count/10 {
+		paginationInfo.NextPage = p
+	} else {
+		paginationInfo.NextPage = p + 1
+	}
+	paginationInfo.HasNextPage = (bool)(count > 10 && count > (p*10))
+	c.JSON(http.StatusOK, paginationInfo)
+}
+
+func getSMSCount(organizationID string, q string) (int, error) {
+	query := "SELECT COUNT(*) FROM (SELECT c.id, user.fname staff_fname, user.lname staff_lname, c.fname, c.lname, c.user_id, c.number, c.msg, c.created, c.sent, user.organization_id organization_id from (SELECT sms.id id, sms.user_id, sms.staff_id, sms.number, sms.msg, sms.sent, sms.created, user.fname , user.lname, user.organization_id organization_id from sms LEFT join user on sms.user_id = user.id ) c left join user on c.staff_id = user.id) s WHERE s.organization_id = ? "
+	var values []interface{}
+	values = append(values, organizationID)
+	count := 0
+	if q != "" && q != "null" && q != "undefined" {
+		query += " AND (s.fname LIKE '%" + q + "%' OR s.lname LIKE '%" + q + "%' OR s.msg LIKE '%" + q + "%')"
+	}
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		return count, nil
+	}
+	result := stmt.QueryRow(values...)
+	err = result.Scan(&count)
+	if err != nil {
+		log.Println(err.Error(), "count")
+		return count, nil
+	}
+	return count, nil
 }
 
 func (uc *SMSControllerStruct) Delete(c *gin.Context) {
-	query := "DELETE FROM `sms` WHERE id in (?)"
+	query := "DELETE FROM `sms` WHERE id in ("
 	var deleteSMSRequest sms2.DeleteSMSRequest
 	if errors := c.ShouldBindJSON(&deleteSMSRequest); errors != nil {
 		log.Println(errors.Error())
 		errorsHandler.GinErrorResponseHandler(c, errors)
 		return
 	}
+	if len(deleteSMSRequest.IDs) == 0 {
+		c.JSON(http.StatusOK, nil)
+		return
+	}
+	var values []interface{}
+	for i := 0; i < len(deleteSMSRequest.IDs); i++ {
+		values = append(values, deleteSMSRequest.IDs[i])
+		if i != len(deleteSMSRequest.IDs) - 1 {
+			query += "?,"
+		} else {
+			query += "?"
+		}
+	}
+	query += ")"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	defer stmt.Close()
-	_, err = stmt.Exec(
-		&deleteSMSRequest.IDs,
+		_, err = stmt.Exec(
+		values...,
 	)
 	if err != nil {
 		log.Println(err.Error())

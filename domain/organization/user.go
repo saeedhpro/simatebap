@@ -49,27 +49,30 @@ type ChangeUserPasswordRequest struct {
 }
 
 type OrganizationUser struct {
-	ID               int64         `json:"id"`
-	FirstName        string        `json:"fname"`
-	LastName         string        `json:"lname"`
-	Tel              string        `json:"tel"`
-	UserGroupID      int           `json:"user_group_id"`
-	Created          *sql.NullTime `json:"created"`
-	LastLogin        *sql.NullTime `json:"last_login"`
-	BirthDate        *sql.NullTime `json:"birth_date"`
-	Birth            int           `json:"birth"`
-	OrganizationID   string        `json:"organization_id"`
-	OrganizationName string        `json:"organization_name"`
-	UserGroupName    string        `json:"user_group_name"`
-	Relation         string        `json:"relation"`
-	Description      string        `json:"description"`
-	Info             string        `json:"info"`
-	Tel1             string        `json:"tel1"`
-	Nid              string        `json:"nid"`
-	Address          string        `json:"address"`
-	Introducer       string        `json:"introducer"`
-	Gender           string        `json:"gender"`
-	FileID           string        `json:"file_id"`
+	ID               int64                 `json:"id"`
+	Logo             string                `json:"logo"`
+	AppCode          string                `json:"appcode"`
+	FirstName        string                `json:"fname"`
+	LastName         string                `json:"lname"`
+	Tel              string                `json:"tel"`
+	UserGroupID      int                   `json:"user_group_id"`
+	Created          *sql.NullTime         `json:"created"`
+	LastLogin        *sql.NullTime         `json:"last_login"`
+	BirthDate        *sql.NullTime         `json:"birth_date"`
+	Birth            int                   `json:"birth"`
+	OrganizationID   string                `json:"organization_id"`
+	OrganizationName string                `json:"organization_name"`
+	UserGroupName    string                `json:"user_group_name"`
+	Relation         string                `json:"relation"`
+	Description      string                `json:"description"`
+	Info             string                `json:"info"`
+	Tel1             string                `json:"tel1"`
+	Nid              string                `json:"nid"`
+	Address          string                `json:"address"`
+	Introducer       string                `json:"introducer"`
+	Gender           string                `json:"gender"`
+	FileID           string                `json:"file_id"`
+	Profession       *SimpleProfessionInfo `json:"profession"`
 }
 
 type LastLoginUser struct {
@@ -85,9 +88,9 @@ type LastLoginUser struct {
 
 type SimpleUserInfo struct {
 	ID           int64  `json:"id"`
-	FirstName    string `json:"fname,omitempty"`
-	LastName     string `json:"lname,omitempty"`
-	Organization string `json:"organization,omitempty"`
+	FirstName    string `json:"fname"`
+	LastName     string `json:"lname"`
+	Organization string `json:"organization"`
 }
 
 type UserGroup struct {
@@ -97,15 +100,18 @@ type UserGroup struct {
 
 type LastLoginUserInfo struct {
 	ID          int64           `json:"id"`
-	FirstName   string          `json:"fname,omitempty"`
-	LastName    string          `json:"lname,omitempty"`
+	FirstName   string          `json:"fname"`
+	LastName    string          `json:"lname"`
 	Tel         string          `json:"tel"`
-	UserGroupID int64           `json:"user_group_id,omitempty"`
-	LastLogin   helper.NullTime `json:"last_login,omitempty"`
+	UserGroupID int64           `json:"user_group_id"`
+	LastLogin   helper.NullTime `json:"last_login"`
 }
 
 type OrganizationUserPaginate struct {
-	Data            []OrganizationUser `json:"data"`
-	HasNextPage     bool               `json:"has_next_page"`
-	HasPreviousPage bool               `json:"has_previous_page"`
+	Data        []OrganizationUser `json:"data"`
+	NextPage    int                `json:"next_page"`
+	PrevPage    int                `json:"prev_page"`
+	Page        int                `json:"page"`
+	HasNextPage bool               `json:"has_next_page"`
+	PagesCount  int                `json:"pages_count"`
 }

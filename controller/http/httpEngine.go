@@ -59,17 +59,37 @@ func Run(Port string) {
 	{
 		v1.POST("/upload", middleware.GinJwtAuth(uploadC.Upload, true, false))
 		v1.POST("/upload/multiple", middleware.GinJwtAuth(uploadC.UploadMultipleFile, true, false))
+		v1.GET("/file/organizations/:id/:name", uploadC.GetUploadedOrgImage)
+		v1.GET("/file/appointments/:id/:prof", appc.GetResultImages)
+		v1.GET("/file/results/:id/:prof/:name", uploadC.GetUploadedResultImage)
 		v1.GET("/file/:path/:name", uploadC.GetUploadedFile)
 	}
 
 	{
 		v1.POST("/organizations", middleware.GinJwtAuth(oc.Create, true, false))
 		v1.GET("/organizations", middleware.GinJwtAuth(oc.GetList, true, false))
+		v1.GET("/organizations/:id/radios", middleware.GinJwtAuth(appc.GetRadiosAppointmentList, true, false))
+		v1.GET("/organizations/:id/photos", middleware.GinJwtAuth(appc.GetPhotosAppointmentList, true, false))
+		v1.GET("/organizations/:id/offs", middleware.GinJwtAuth(appc.GetOffsAppointmentList, true, false))
+		v1.GET("/organizations/all", middleware.GinJwtAuth(oc.GetListAll, true, false))
 		v1.GET("/organizations/:id", middleware.GinJwtAuth(oc.Get, true, false))
+		v1.GET("/organizations/:id/work-time", middleware.GinJwtAuth(oc.GetOrganizationWorkTime, true, false))
+		v1.POST("/organizations/:id/work-time", middleware.GinJwtAuth(oc.UpdateOrganizationWorkTime, true, false))
 		v1.PUT("/organizations/:id", middleware.GinJwtAuth(oc.Update, true, false))
+		v1.GET("/organizations/:id/appointments", middleware.GinJwtAuth(oc.GetOrganizationAppointments, true, false))
+		v1.GET("/organizations/:id/images", middleware.GinJwtAuth(oc.GetOrganizationImages, true, false))
+		v1.POST("/organizations/:id/images", middleware.GinJwtAuth(oc.UploadOrganizationImage, true, false))
+		v1.GET("/organizations/:id/about", middleware.GinJwtAuth(oc.GetOrganizationAbout, true, false))
+		v1.PUT("/organizations/:id/about", middleware.GinJwtAuth(oc.UpdateOrganizationAbout, true, false))
 		v1.GET("/organizations/:id/rels", middleware.GinJwtAuth(oc.GetOrganizationRelList, true, false))
+		v1.GET("/organizations/:id/vip/schedule", middleware.GinJwtAuth(oc.GetOrganizationScheduleList, true, false))
+		v1.POST("/organizations/:id/vip/schedule", middleware.GinJwtAuth(oc.CreateOrganizationSchedule, true, false))
+		v1.GET("/organizations/:id/vip/cases", middleware.GinJwtAuth(oc.GetOrganizationScheduleCasesList, true, false))
+		v1.POST("/organizations/:id/vip/cases", middleware.GinJwtAuth(oc.CreateOrganizationScheduleCase, true, false))
+		v1.GET("/organizations/:id/rel-offices", middleware.GinJwtAuth(oc.GetOrganizationRelOfficesList, true, false))
 		v1.POST("/organizations/:id/slider", middleware.GinJwtAuth(oc.SetOrganizationSlider, true, false))
 		v1.GET("/organizations/:id/users", middleware.GinJwtAuth(oc.GetUsers, true, false))
+		v1.GET("/organizations/:id/employees", middleware.GinJwtAuth(oc.GetEmployees, true, false))
 		v1.GET("/organizations/:id/wallet", middleware.GinJwtAuth(oc.GetOrganizationWallet, true, false))
 		v1.POST("/organizations/:id/wallet/increase", middleware.GinJwtAuth(oc.IncreaseOrganizationWallet, true, false))
 		v1.POST("/organizations/:id/wallet/decrease", middleware.GinJwtAuth(oc.DecreaseOrganizationWallet, true, false))
@@ -77,24 +97,44 @@ func Run(Port string) {
 	}
 
 	{
+		//v1.GET("/vip/schedule/reserve", middleware.GinJwtAuth(oc.ReserveVip, true, false))
+		v1.GET("/vip/schedule/:id", middleware.GinJwtAuth(oc.GetOrganizationSchedule, true, false))
+		v1.GET("/vip/cases/:id", middleware.GinJwtAuth(oc.GetVipScheduleCase, true, false))
+	}
+
+	{
+		v1.GET("/own", middleware.GinJwtAuth(uc.Own, true, false))
 		v1.POST("/users", middleware.GinJwtAuth(uc.Create, true, false))
 		v1.GET("/users", middleware.GinJwtAuth(uc.GetList, true, false))
 		v1.GET("/users/last-login", middleware.GinJwtAuth(uc.GetLastLoginUsers, true, false))
 		v1.GET("/users/last-patient-login", middleware.GinJwtAuth(uc.GetLastLoginPatients, true, false))
+		v1.POST("/users/items", middleware.GinJwtAuth(uc.DeleteItems, true, false))
+		v1.PUT("/users/:id/code", middleware.GinJwtAuth(uc.CreateCode, true, false))
+		v1.GET("/users/:id/docs", middleware.GinJwtAuth(uc.GetUserDocs, true, false))
+		v1.POST("/users/:id/docs", middleware.GinJwtAuth(uc.SendDoc, true, false))
 		v1.GET("/users/:id", middleware.GinJwtAuth(uc.Get, true, false))
 		v1.PUT("/users/:id", middleware.GinJwtAuth(uc.Update, true, false))
 		v1.DELETE("/users/:id", middleware.GinJwtAuth(uc.Delete, true, false))
 		v1.PATCH("/users/:id/password", middleware.GinJwtAuth(uc.ChangePassword, true, false))
 		v1.GET("/users/:id/appointments", middleware.GinJwtAuth(uc.GetUserAppointmentList, true, false))
+		v1.GET("/users/:id/appointments/results", middleware.GinJwtAuth(uc.GetUserAppointmentResultList, true, false))
 		v1.GET("/users/:id/wallet", middleware.GinJwtAuth(uc.GetUserWallet, true, false))
+		v1.GET("/users/:id/wallet/histories", middleware.GinJwtAuth(uc.GetUserWalletHistories, true, false))
+		v1.POST("/users/:id/wallet/histories", middleware.GinJwtAuth(uc.CreateUserWalletHistories, true, false))
+		v1.GET("/users/:id/wallet/histories/sum", middleware.GinJwtAuth(uc.GetUserWalletHistoriesSum, true, false))
+		v1.GET("/users/:id/wallet/histories/days", middleware.GinJwtAuth(uc.GetUserWalletHistoriesDays, true, false))
 		v1.POST("/users/:id/wallet/increase", middleware.GinJwtAuth(uc.IncreaseUserWallet, true, false))
 		v1.POST("/users/:id/wallet/decrease", middleware.GinJwtAuth(uc.DecreaseUserWallet, true, false))
 		v1.POST("/users/:id/wallet/set", middleware.GinJwtAuth(uc.SetUserWallet, true, false))
 		v1.GET("/users/:id/payments", middleware.GinJwtAuth(pc.GetPaymentList, true, false))
+		v1.GET("/users/:id/orthodontics", middleware.GinJwtAuth(uc.GetOrthodonticsList, true, false))
+		v1.POST("/users/:id/orthodontics", middleware.GinJwtAuth(uc.CreateOrthodonticsList, true, false))
+		v1.DELETE("/docs/:id", middleware.GinJwtAuth(uc.DeleteDoc, true, false))
 	}
 
 	{
 		v1.POST("/payments", middleware.GinJwtAuth(pc.Create, true, false))
+		v1.POST("/payments/delete", middleware.GinJwtAuth(pc.DeleteItems, true, false))
 		v1.PUT("/payments/:id", middleware.GinJwtAuth(pc.Update, true, false))
 		v1.DELETE("/payments/:id", middleware.GinJwtAuth(pc.Delete, true, false))
 	}
@@ -103,8 +143,10 @@ func Run(Port string) {
 		v1.GET("/appointments", middleware.GinJwtAuth(appc.GetAppointmentList, true, false))
 		v1.POST("/appointments", middleware.GinJwtAuth(appc.Create, true, false))
 		v1.GET("/appointments/code", middleware.GinJwtAuth(appc.GetAppointmentByCode, true, false))
+		v1.GET("/appointments/:id", middleware.GinJwtAuth(appc.Get, true, false))
 		v1.PUT("/appointments/:id", middleware.GinJwtAuth(appc.Update, true, false))
 		v1.PATCH("/appointments/:id", middleware.GinJwtAuth(appc.ChangeStatus, true, false))
+		v1.POST("/appointments/:id/results", middleware.GinJwtAuth(appc.SendResult, true, false))
 		v1.POST("/appointments/:id/accept", middleware.GinJwtAuth(appc.AcceptAppointment, true, false))
 		v1.GET("/appointments/:id/admissions", middleware.GinJwtAuth(appc.GetAppointmentAdmissions, true, false))
 		v1.POST("/appointments/:id/finished", middleware.GinJwtAuth(appc.FinishAppointmentAdmissions, true, false))
@@ -130,6 +172,8 @@ func Run(Port string) {
 
 	{
 		v1.GET("/cases", middleware.GinJwtAuth(caseC.GetList, true, false))
+		v1.GET("/cases/insert", middleware.GinJwtAuth(caseC.InsertAll, true, false))
+		v1.GET("/cases/prof", middleware.GinJwtAuth(caseC.GetList, true, false))
 		v1.GET("/cases/:id", middleware.GinJwtAuth(caseC.Get, true, false))
 	}
 
@@ -137,7 +181,7 @@ func Run(Port string) {
 		v1.GET("/sms", middleware.GinJwtAuth(smsc.GetList, true, false))
 		v1.POST("/sms", middleware.GinJwtAuth(smsc.Create, true, false))
 		v1.GET("/sms/:id", middleware.GinJwtAuth(smsc.Get, true, false))
-		v1.DELETE("/sms", middleware.GinJwtAuth(smsc.Delete, true, false))
+		v1.POST("/sms/items", middleware.GinJwtAuth(smsc.Delete, true, false))
 	}
 
 	{

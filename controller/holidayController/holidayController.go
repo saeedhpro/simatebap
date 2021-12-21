@@ -51,6 +51,7 @@ func (uc *HolidayControllerStruct) Create(c *gin.Context) {
 		createHolidayRequest.OrganizationID,
 		createHolidayRequest.Title,
 	)
+	log.Println(createHolidayRequest.OrganizationID, "org")
 	if err != nil {
 		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
@@ -98,46 +99,49 @@ func (uc *HolidayControllerStruct) Get(c *gin.Context) {
 }
 
 func (uc *HolidayControllerStruct) GetList(c *gin.Context) {
-	startAt := c.Query("start_at")
-	endAt := c.Query("end_at")
-	if startAt == "" || endAt == "" {
-		log.Println("start at or and end at are needed!")
-		c.JSON(422, gin.H{
-			"message": "start at or and end at are needed!",
-		})
-		return
-	}
-	startAtDate := fmt.Sprintf("%s 00:00:00", startAt)
-	endAtDate := fmt.Sprintf("%s 00:00:00", endAt)
-	GetOrganizationHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name,'') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id WHERE holiday.organization_id = ? AND DATE(holiday.hdate) between ? AND ? ORDER BY hdate ASC"
-	stmt, err := repository.DBS.MysqlDb.Prepare(GetOrganizationHolidaysQuery)
-	if err != nil {
-		errorsHandler.GinErrorResponseHandler(c, err)
-		return
-	}
-	holidays := []holiday.HolidayInfo{}
-	var holiday holiday.HolidayInfo
-	user := auth.GetStaffUser(c)
+	startAt := c.Query("start_date")
+	endAt := c.Query("end_date")
+	GetOrganizationHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name,'') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id WHERE holiday.organization_id = ? "
 	var values []interface{}
-	values = append(values, user.OrganizationID, startAtDate, endAtDate)
-	rows, err := stmt.Query(values...)
+	if startAt != "" && startAt != "null"  {
+		GetOrganizationHolidaysQuery += " AND DATE(holiday.hdate) >= ? "
+		values = append(values, startAt)
+	}
+	if endAt != "" && endAt != "null"  {
+		GetOrganizationHolidaysQuery += " AND DATE(holiday.hdate) <= ? "
+		values = append(values, endAt)
+	}
+	GetOrganizationHolidaysQuery += " ORDER BY hdate ASC"
+	stmt, err := repository.DBS.MysqlDb.Prepare(GetOrganizationHolidaysQuery)
 	if err != nil {
 		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
+	holidays := []holiday.HolidayInfo{}
+	var hd holiday.HolidayInfo
+	user := auth.GetStaffUser(c)
+	values = append(values, user.OrganizationID)
+	rows, err := stmt.Query(values...)
+	if err != nil {
+		log.Println(err.Error())
+		c.JSON(http.StatusOK, holidays)
+		return
+	}
 	for rows.Next() {
 		err := rows.Scan(
-			&holiday.ID,
-			&holiday.Title,
-			&holiday.HDate,
-			&holiday.OrganizationID,
-			&holiday.OrganizationName,
+			&hd.ID,
+			&hd.Title,
+			&hd.HDate,
+			&hd.OrganizationID,
+			&hd.OrganizationName,
 		)
 		if err != nil {
 			log.Println(err.Error())
+			c.JSON(http.StatusOK, holidays)
+			return
 		}
-		holidays = append(holidays, holiday)
+		holidays = append(holidays, hd)
 	}
 	c.JSON(http.StatusOK, holidays)
 }
@@ -147,7 +151,7 @@ func (uc *HolidayControllerStruct) GetListForAdmin(c *gin.Context) {
 	if page == "" {
 		page = "1"
 	}
-	GetAdminHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, organization.name organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id LIMIT 10 OFFSET ?"
+	GetAdminHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name, '') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(GetAdminHolidaysQuery)
 	if err != nil {
 		errorsHandler.GinErrorResponseHandler(c, err)
@@ -218,6 +222,10 @@ func getHolidayUpdateColumns(o *holiday.UpdateHolidayRequest, columns *[]string,
 	if o.Title != "" {
 		*columns = append(*columns, " `title` = ? ")
 		*values = append(*values, o.Title)
+	}
+	if o.OrganizationID != 0  {
+		*columns = append(*columns, " `organization_id` = ? ")
+		*values = append(*values, o.OrganizationID)
 	}
 }
 

@@ -109,7 +109,7 @@ func (uc *CaseTypeControllerStruct) GetListByOrganization(c *gin.Context) {
 }
 
 func LoadCaseTypesByOrgId(id int64) []caseType.CaseTypeInfo {
-	var caseTypes []caseType.CaseTypeInfo
+	caseTypes := []caseType.CaseTypeInfo{}
 	var caseType caseType.CaseTypeInfo
 	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.GetCaseTypesListForOrganizationQuery)
 	if err != nil {

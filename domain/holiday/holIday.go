@@ -3,14 +3,15 @@ package holiday
 import "time"
 
 type CreateHolidayRequest struct {
-	OrganizationID int64     `json:"organization_id"`
-	HDate          time.Time `json:"hdate"`
-	Title          string    `json:"title"`
+	OrganizationID int64  `json:"organization_id"`
+	HDate          string `json:"hdate"`
+	Title          string `json:"title"`
 }
 
 type UpdateHolidayRequest struct {
-	HDate time.Time `json:"hdate"`
-	Title string    `json:"title"`
+	HDate          time.Time `json:"hdate"`
+	Title          string    `json:"title"`
+	OrganizationID int64     `json:"organization_id"`
 }
 
 type HolidayInfo struct {

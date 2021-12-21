@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gitlab.com/simateb-project/simateb-backend/domain/appointment"
 	"gitlab.com/simateb-project/simateb-backend/repository"
+	user2 "gitlab.com/simateb-project/simateb-backend/repository/user"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"log"
 )
@@ -43,11 +44,7 @@ func (uc *AppointmentRepositoryStruct) LoadQueWithOrganization(organizationID in
 		err = rows.Scan(
 			&appointment.ID,
 			&appointment.StartAt,
-			&appointment.UserFName,
-			&appointment.UserLName,
-			&appointment.UserGender,
 			&appointment.UserID,
-			&appointment.Mobile,
 			&appointment.Status,
 			&appointment.CaseType,
 			&appointment.Duration,
@@ -57,6 +54,7 @@ func (uc *AppointmentRepositoryStruct) LoadQueWithOrganization(organizationID in
 		if err != nil {
 			log.Println(err.Error())
 		}
+		appointment.User, _ = user2.GetUserByID(appointment.UserID)
 		appointments = append(appointments, appointment)
 	}
 	return appointments

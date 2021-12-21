@@ -5,7 +5,6 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/domain/appointment"
 	"gitlab.com/simateb-project/simateb-backend/helper"
 	"gitlab.com/simateb-project/simateb-backend/repository"
-	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
 	"log"
@@ -33,7 +32,8 @@ func (uc *VipControllerStruct) Create(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, errors)
 		return
 	}
-	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.CreateAppointmentQuery)
+	query := ""
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
