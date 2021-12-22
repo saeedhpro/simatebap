@@ -1,4 +1,10 @@
 {
   "app": "simateb",
-  "port": 8000
+  "port": 8000,
+  "disks": [
+    {
+      "name": "images",
+      "mountTo": "/images"
+    }
+  ]
 }

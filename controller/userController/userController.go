@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"gitlab.com/simateb-project/simateb-backend/controller/organizationController"
 	appointment2 "gitlab.com/simateb-project/simateb-backend/domain/appointment"
 	"gitlab.com/simateb-project/simateb-backend/domain/organization"
 	sms2 "gitlab.com/simateb-project/simateb-backend/domain/sms"
@@ -459,25 +460,39 @@ func (uc *UserControllerStruct) GetLastLoginPatients(c *gin.Context) {
 }
 
 func (uc *UserControllerStruct) GetUserAppointmentList(c *gin.Context) {
-	getUserAppointmentListQuery := "SELECT id, user_id, created_at, ifnull(info, '') info, staff_id, start_at, end_at, status, ifnull(director_id, -1) director_id, updated_at, income, ifnull(subject, '') subject, ifnull(case_type, '') case_type, ifnull(laboratory_cases, '') laboratory_cases, ifnull(photography_cases, '') photography_cases, ifnull(radiology_cases, '') radiology_cases, ifnull(prescription, '') prescription, ifnull(future_prescription, '') future_prescription, ifnull(laboratory_msg, '') laboratory_msg, ifnull(photography_msg, '') photography_msg, ifnull(radiology_msg, '') radiology_msg, organization_id, ifnull(director_id, -1) laboratory_id, ifnull(photography_id, -1) photography_id, ifnull(radiology_id, -1) radiology_id, l_admission_at, r_admission_at, p_admission_at, l_result_at, r_result_at, p_result_at, ifnull(l_rnd_img, '') l_rnd_img, ifnull(r_rnd_img, '') r_rnd_img, ifnull(p_rnd_img, '') p_rnd_img, l_imgs, r_imgs, p_imgs, ifnull(code, '') code, is_vip, ifnull(vip_introducer, 0) vip_introducer, absence, ifnull(file_id, '') file_id FROM appointment WHERE organization_id = ? AND user_id = ?"
+	query := "SELECT id, user_id, created_at, ifnull(info, '') info, staff_id, start_at, end_at, status, ifnull(director_id, -1) director_id, updated_at, income, ifnull(subject, '') subject, ifnull(case_type, '') case_type, ifnull(laboratory_cases, '') laboratory_cases, ifnull(photography_cases, '') photography_cases, ifnull(radiology_cases, '') radiology_cases, ifnull(prescription, '') prescription, ifnull(future_prescription, '') future_prescription, ifnull(laboratory_msg, '') laboratory_msg, ifnull(photography_msg, '') photography_msg, ifnull(radiology_msg, '') radiology_msg, organization_id, ifnull(director_id, -1) laboratory_id, ifnull(photography_id, -1) photography_id, ifnull(radiology_id, -1) radiology_id, l_admission_at, r_admission_at, p_admission_at, l_result_at, r_result_at, p_result_at, ifnull(l_rnd_img, '') l_rnd_img, ifnull(r_rnd_img, '') r_rnd_img, ifnull(p_rnd_img, '') p_rnd_img, l_imgs, r_imgs, p_imgs, ifnull(code, '') code, is_vip, ifnull(vip_introducer, 0) vip_introducer, absence, ifnull(file_id, '') file_id FROM appointment WHERE user_id = ? "
 	userID := c.Param("id")
-	stmt, err := repository.DBS.MysqlDb.Prepare(getUserAppointmentListQuery)
+	staffUser := auth.GetStaffUser(c)
+	if staffUser == nil {
+		errorsHandler.GinErrorResponseHandler(c, nil)
+		return
+	}
+	staffOrg := organizationController.GetOrganization(fmt.Sprintf("%d", staffUser.OrganizationID))
+	if staffOrg == nil {
+		errorsHandler.GinErrorResponseHandler(c, nil)
+		return
+	}
+	if staffOrg.ProfessionID == "1" {
+		query += " AND photography_id = ? "
+	} else if staffOrg.ProfessionID == "2" {
+		query += " AND laboratory_id = ? "
+	} else if staffOrg.ProfessionID == "3" {
+		query += " AND radiology_id = ? "
+	} else {
+		query += " AND organization_id = ? "
+	}
+	appointments := []appointment2.UserAppointmentInfo{}
+	var appointment appointment2.UserAppointmentInfo
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error(), "prepare")
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	staffUser := auth.GetStaffUser(c)
-	if staffUser == nil {
-		errorsHandler.GinErrorResponseHandler(c, err)
-		return
-	}
-	var appointments []appointment2.UserAppointmentInfo
-	var appointment appointment2.UserAppointmentInfo
-	rows, err := stmt.Query(staffUser.OrganizationID, userID)
-	defer rows.Close()
+	rows, err := stmt.Query(userID, staffUser.OrganizationID)
 	if err != nil {
 		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
 	for rows.Next() {
@@ -536,20 +551,34 @@ func (uc *UserControllerStruct) GetUserAppointmentList(c *gin.Context) {
 }
 
 func (uc *UserControllerStruct) GetUserAppointmentResultList(c *gin.Context) {
-	query := "SELECT id, user_id, created_at, ifnull(info, '') info, staff_id, start_at, end_at, status, ifnull(director_id, -1) director_id, updated_at, income, ifnull(subject, '') subject, ifnull(case_type, '') case_type, ifnull(laboratory_cases, '') laboratory_cases, ifnull(photography_cases, '') photography_cases, ifnull(radiology_cases, '') radiology_cases, ifnull(prescription, '') prescription, ifnull(future_prescription, '') future_prescription, ifnull(laboratory_msg, '') laboratory_msg, ifnull(photography_msg, '') photography_msg, ifnull(radiology_msg, '') radiology_msg, organization_id, ifnull(director_id, -1) laboratory_id, ifnull(photography_id, -1) photography_id, ifnull(radiology_id, -1) radiology_id, l_admission_at, r_admission_at, p_admission_at, l_result_at, r_result_at, p_result_at, ifnull(l_rnd_img, '') l_rnd_img, ifnull(r_rnd_img, '') r_rnd_img, ifnull(p_rnd_img, '') p_rnd_img, l_imgs, r_imgs, p_imgs, ifnull(code, '') code, is_vip, ifnull(vip_introducer, 0) vip_introducer, absence, ifnull(file_id, '') file_id FROM appointment WHERE organization_id = ? AND user_id = ? "
+	query := "SELECT id, user_id, created_at, ifnull(info, '') info, staff_id, start_at, end_at, status, ifnull(director_id, -1) director_id, updated_at, income, ifnull(subject, '') subject, ifnull(case_type, '') case_type, ifnull(laboratory_cases, '') laboratory_cases, ifnull(photography_cases, '') photography_cases, ifnull(radiology_cases, '') radiology_cases, ifnull(prescription, '') prescription, ifnull(future_prescription, '') future_prescription, ifnull(laboratory_msg, '') laboratory_msg, ifnull(photography_msg, '') photography_msg, ifnull(radiology_msg, '') radiology_msg, organization_id, ifnull(director_id, -1) laboratory_id, ifnull(photography_id, -1) photography_id, ifnull(radiology_id, -1) radiology_id, l_admission_at, r_admission_at, p_admission_at, l_result_at, r_result_at, p_result_at, ifnull(l_rnd_img, '') l_rnd_img, ifnull(r_rnd_img, '') r_rnd_img, ifnull(p_rnd_img, '') p_rnd_img, l_imgs, r_imgs, p_imgs, ifnull(code, '') code, is_vip, ifnull(vip_introducer, 0) vip_introducer, absence, ifnull(file_id, '') file_id FROM appointment WHERE user_id = ? "
 	userID := c.Param("id")
 	appointments := []appointment2.UserAppointmentInfo{}
 	var appointment appointment2.UserAppointmentInfo
 	staffUser := auth.GetStaffUser(c)
+	staffOrg := organizationController.GetOrganization(fmt.Sprintf("%d", staffUser.OrganizationID))
+	if staffOrg == nil {
+		errorsHandler.GinErrorResponseHandler(c, nil)
+		return
+	}
+	if staffOrg.ProfessionID == "1" {
+		query += " AND photography_id = ? "
+	} else if staffOrg.ProfessionID == "2" {
+		query += " AND laboratory_id = ? "
+	} else if staffOrg.ProfessionID == "3" {
+		query += " AND radiology_id = ? "
+	} else {
+		query += " AND organization_id = ? "
+	}
 	prof := c.Query("prof")
 	if prof == "photo" {
-		query += "OR photography_id = ? AND p_result_at IS NOT NULL "
+		query += " AND p_result_at IS NOT NULL "
 	}
 	if prof == "lab" {
-		query += "OR labratory_id = ? AND l_result_at IS NOT NULL "
+		query += " AND l_result_at IS NOT NULL "
 	}
 	if prof == "radio" {
-		query += "OR radiology_id = ? AND r_result_at IS NOT NULL "
+		query += " AND r_result_at IS NOT NULL "
 	}
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
@@ -557,7 +586,7 @@ func (uc *UserControllerStruct) GetUserAppointmentResultList(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	rows, err := stmt.Query(staffUser.OrganizationID, userID, staffUser.OrganizationID)
+	rows, err := stmt.Query(userID, staffUser.OrganizationID)
 	defer rows.Close()
 	if err != nil {
 		log.Println(err.Error())
