@@ -13,7 +13,7 @@ var (
 	host     = "localhost:3306"
 	//schema = "simateb"
 	schema   = "newsimateb"
-	//password = "C9MEzGxJDCcoJicsyHDZ5ZI5"
+	//password = "LTIjewAWSKF9nwJGUDTgjEJ6"
 	password = ""
 	username = "root"
 )

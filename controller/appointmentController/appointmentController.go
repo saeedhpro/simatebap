@@ -512,7 +512,7 @@ func (uc *AppointmentControllerStruct) GetPhotosAppointmentList(c *gin.Context) 
 	organizationID := c.Param("id")
 	page := c.Query("page")
 	values = append(values, organizationID, page)
-	query := "SELECT appointment.id id, appointment.user_id user_id, ifnull(appointment.prescription, '') prescription,ifnull(appointment.radiology_cases, '') radiology_cases,ifnull(appointment.photography_cases, '') photography_cases, appointment.start_at start_at, ifnull(appointment.info, '') info, appointment.income, ifnull(appointment.case_type, '') case_type, ifnull(appointment.code, '') code, appointment.status status, ifnull(user.fname, '') fname, ifnull(user.lname, '') lname, ifnull(user.tel, '') tel, ifnull(user.file_id, '') file_id FROM `appointment` LEFT JOIN `user` on `appointment`.`user_id` = `user`.id WHERE appointment.photography_id = ? AND appointment.status = 2 AND appointment.p_result_at IS NULL LIMIT 10 OFFSET ?"
+	query := "SELECT appointment.id id, appointment.user_id user_id, ifnull(appointment.prescription, '') prescription,appointment.radiology_status, appointment.photography_status,ifnull(appointment.radiology_cases, '') radiology_cases,ifnull(appointment.photography_cases, '') photography_cases, appointment.start_at start_at, ifnull(appointment.info, '') info, appointment.income, ifnull(appointment.case_type, '') case_type, ifnull(appointment.code, '') code, appointment.status status, ifnull(user.fname, '') fname, ifnull(user.lname, '') lname, ifnull(user.tel, '') tel, ifnull(user.file_id, '') file_id FROM `appointment` LEFT JOIN `user` on `appointment`.`user_id` = `user`.id WHERE appointment.photography_id = ? AND appointment.status = 2 AND appointment.p_result_at IS NULL LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error(), "first")
@@ -529,6 +529,8 @@ func (uc *AppointmentControllerStruct) GetPhotosAppointmentList(c *gin.Context) 
 			&app.ID,
 			&app.UserID,
 			&app.Prescription,
+			&app.RadiologyStatus,
+			&app.PhotographyStatus,
 			&app.RadiologyCases,
 			&app.PhotographyCases,
 			&app.StartAt,

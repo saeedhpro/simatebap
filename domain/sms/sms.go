@@ -7,7 +7,8 @@ import (
 )
 
 const ApiKey = "68594136704C39444A5474653364346B387A64534D5132664F6F36646F4E3875"
-const Sender = "0018018949161"
+//const Sender = "0018018949161"
+const Sender = "10008663"
 
 type SMS struct {
 	ID             int64        `json:"id"`
@@ -47,7 +48,7 @@ func (s SendSMSRequest) SendSMS() (bool, *string) {
 
 func SendByPackage(sender string, receptor []string, message string) (bool, *string) {
 	api := kavenegar.New(ApiKey)
-	if res, err := api.Message.Send(sender, receptor, message, nil); err != nil {
+	if res, err := api.Message.Send("10008663", receptor, message, nil); err != nil {
 		switch err := err.(type) {
 		case *kavenegar.APIError:
 			log.Println(err.Error())

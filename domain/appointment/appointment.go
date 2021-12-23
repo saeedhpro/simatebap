@@ -72,7 +72,9 @@ type UserAppointmentInfo struct {
 	Subject            string        `json:"subject"`
 	CaseType           string        `json:"case_type"`
 	LaboratoryCases    string        `json:"laboratory_cases"`
+	PhotographyStatus   string        `json:"photography_status"`
 	PhotographyCases   string        `json:"photography_cases"`
+	RadiologyStatus     string        `json:"radiology_status"`
 	RadiologyCases     string        `json:"radiology_cases"`
 	Prescription       string        `json:"prescription"`
 	FuturePrescription string        `json:"future_prescription"`

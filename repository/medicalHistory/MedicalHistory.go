@@ -44,6 +44,9 @@ type MedicalHistoryStruct struct {
 	TreatmentPlan           string `json:"treatment_plan"`
 	LengthActiveTreatment   string `json:"length_active_treatment"`
 	Retention               string `json:"retention"`
+	Prognosis               string `json:"prognosis"`
+	Consultation            string `json:"consultation"`
+	Charging                string `json:"charging"`
 }
 
 type CreateMedicalHistoryStruct struct {
@@ -84,10 +87,12 @@ type CreateMedicalHistoryStruct struct {
 	TreatmentPlan           string `json:"treatment_plan"`
 	LengthActiveTreatment   string `json:"length_active_treatment"`
 	Retention               string `json:"retention"`
+	Prognosis               string `json:"prognosis"`
+	Consultation            string `json:"consultation"`
+	Charging                string `json:"charging"`
 }
 
 func GetMedicalHistory(userID string) (*MedicalHistoryStruct, error) {
-	histories := []MedicalHistoryStruct{}
 	history := MedicalHistoryStruct{}
 	query := "SELECT " +
 		"ifnull(user_id, 0) user_id," +
@@ -126,87 +131,85 @@ func GetMedicalHistory(userID string) (*MedicalHistoryStruct, error) {
 		"ifnull(diagnosis, '') diagnosis," +
 		"ifnull(treatment_plan, '') treatment_plan," +
 		"ifnull(length_active_treatment, '') length_active_treatment," +
-		"ifnull(retention, '') retention" +
+		"ifnull(retention, '') retention," +
+		"ifnull(prognosis, '') prognosis," +
+		"ifnull(consultation, '') consultation," +
+		"ifnull(charging, '') charging" +
 		" FROM medical_history_orthodontics WHERE user_id = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error(), "prepare")
-		return &history, err
+		return nil, err
 	}
-	rows, err := stmt.Query(userID)
+	row := stmt.QueryRow(userID)
+	err = row.Scan(
+		&history.UserID,
+		&history.AdenoidTonsileReduction,
+		&history.MedicalCondition,
+		&history.ConsumableMedicine,
+		&history.GeneralHealth,
+		&history.UnderPhysicianCare,
+		&history.AccidentToHead,
+		&history.Operations,
+		&history.ChiefComplaint,
+		&history.PreviousOrthodontic,
+		&history.OralHygiene,
+		&history.Frontal,
+		&history.Profile,
+		&history.TeethPresent,
+		&history.UnErupted,
+		&history.IeMissing,
+		&history.IeExtracted,
+		&history.IeImpacted,
+		&history.IeSupernumerary,
+		&history.IeCaries,
+		&history.IeRct,
+		&history.IeAnomalies,
+		&history.LeftMolar,
+		&history.RightMolar,
+		&history.LeftCanine,
+		&history.RightCanine,
+		&history.Overjet,
+		&history.Overbite,
+		&history.Crossbite,
+		&history.CrowdingMd,
+		&history.CrowdingMx,
+		&history.SpacingMx,
+		&history.SpacingMd,
+		&history.Diagnosis,
+		&history.TreatmentPlan,
+		&history.LengthActiveTreatment,
+		&history.Retention,
+		&history.Prognosis,
+		&history.Consultation,
+		&history.Charging,
+	)
 	if err != nil {
-		log.Println(err.Error(), "prepare")
-		return &history, err
-	}
-	for rows.Next() {
-		err = rows.Scan(
-			&history.UserID,
-			&history.AdenoidTonsileReduction,
-			&history.MedicalCondition,
-			&history.ConsumableMedicine,
-			&history.GeneralHealth,
-			&history.UnderPhysicianCare,
-			&history.AccidentToHead,
-			&history.Operations,
-			&history.ChiefComplaint,
-			&history.PreviousOrthodontic,
-			&history.OralHygiene,
-			&history.Frontal,
-			&history.Profile,
-			&history.TeethPresent,
-			&history.UnErupted,
-			&history.IeMissing,
-			&history.IeExtracted,
-			&history.IeImpacted,
-			&history.IeSupernumerary,
-			&history.IeCaries,
-			&history.IeRct,
-			&history.IeAnomalies,
-			&history.LeftMolar,
-			&history.RightMolar,
-			&history.LeftCanine,
-			&history.RightCanine,
-			&history.Overjet,
-			&history.Overbite,
-			&history.Crossbite,
-			&history.CrowdingMd,
-			&history.CrowdingMx,
-			&history.SpacingMx,
-			&history.SpacingMd,
-			&history.Diagnosis,
-			&history.TreatmentPlan,
-			&history.LengthActiveTreatment,
-			&history.Retention,
-		)
-		if err != nil {
-			log.Println(err.Error(), " :err: ")
-			return &history, err
-		}
-		histories = append(histories, history)
-	}
-	if len(histories) > 0 {
-		return &histories[0], nil
+		log.Println(err.Error(), " :err: ")
+		return nil, err
 	}
 	return &history, nil
 }
 
 func CreateMedicalHistory(request CreateMedicalHistoryStruct) error {
-	hs, err := GetMedicalHistory(fmt.Sprintf("%d", request.UserID))
+	h, err := GetMedicalHistory(fmt.Sprintf("%d", request.UserID))
 	if err != nil {
-		log.Println(err.Error(), "err")
+		log.Println(err.Error())
 	}
-	if hs != nil {
+	if h == nil {
 		query := "UPDATE `medical_history_orthodontics` SET" +
-			"`adenoid_tonsile_reduction` = ?,`medical_condition` = ?," +
-			"`consumable_medicine`= ?,`general_health`= ?,`under_physician_care` = ?," +
+			"`adenoid_tonsile_reduction` = ? ,`medical_condition` = ? ," +
+			"`consumable_medicine`= ? ,`general_health`= ? ,`under_physician_care` = ? ," +
 			"`accident_to_Head`= ? ,`operations`= ?,`chief_complaint`= ? ," +
-			"`previous_orthodontic`= ?,`oral_hygiene`= ?,`frontal`=?," +
-			"`profile`= ?,`teeth_present`= ?,`un_erupted`=?,`ie_missing`=?," +
+			"`previous_orthodontic`= ? ,`oral_hygiene`= ? ,`frontal`= ? ," +
+			"`profile`= ? ,`teeth_present`= ? ,`un_erupted`= ? ,`ie_missing`= ? ," +
 			"`ie_extracted`= ?,`ie_impacted`= ?,`ie_supernumerary`= ?,`ie_caries`=?," +
 			"`ie_rct`=?,`ie_anomalies`=?,`left_molar`=?,`right_molar`=?," +
 			"`left_canine`=?,`right_canine`=?,`overjet`=?,`overbite`=?," +
-			"`crossbite`=?,`crowding_md`=?,`crowding_mx`=,`spacing_mx`=?,`spacing_md`=?," +
-			"`diagnosis`=?,`treatment_plan`=?,`length_active_treatment`= ?,`retention`= ? WHERE User_id = ?"
+			"`crossbite`=?,`crowding_md`=?,`crowding_mx`= ?,`spacing_mx`=?,`spacing_md`=?," +
+			"`diagnosis`=?,`treatment_plan`=?,`length_active_treatment`= ?,`retention`= ?," +
+			"`prognosis`=?,`consultation`=?,`charging`= ? " +
+			" WHERE user_id = ?"
 		stmt, err := repository.DBS.MysqlDb.Prepare(query)
 		if err != nil {
 			return err
@@ -248,6 +251,9 @@ func CreateMedicalHistory(request CreateMedicalHistoryStruct) error {
 			&request.TreatmentPlan,
 			&request.LengthActiveTreatment,
 			&request.Retention,
+			&request.Prognosis,
+			&request.Consultation,
+			&request.Charging,
 			&request.UserID,
 		)
 		if err != nil {
@@ -255,8 +261,8 @@ func CreateMedicalHistory(request CreateMedicalHistoryStruct) error {
 		}
 		return nil
 	} else {
-		query := "INSERT INTO `medical_history_orthodontics`(`user_id`, `adenoid_tonsile_reduction`, `medical_condition`, `consumable_medicine`, `general_health`, `under_physician_care`, `accident_to_Head`, `operations`, `chief_complaint`, `previous_orthodontic`, `oral_hygiene`, `frontal`, `profile`, `teeth_present`, `un_erupted`, `ie_missing`, `ie_extracted`, `ie_impacted`, `ie_supernumerary`, `ie_caries`, `ie_rct`, `ie_anomalies`, `left_molar`, `right_molar`, `left_canine`, `right_canine`, `overjet`, `overbite`, `crossbite`, `crowding_md`, `crowding_mx`, `spacing_mx`, `spacing_md`, `diagnosis`, `treatment_plan`, `length_active_treatment`, `retention`)" +
-			" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+		query := "INSERT INTO `medical_history_orthodontics`(`user_id`, `adenoid_tonsile_reduction`, `medical_condition`, `consumable_medicine`, `general_health`, `under_physician_care`, `accident_to_Head`, `operations`, `chief_complaint`, `previous_orthodontic`, `oral_hygiene`, `frontal`, `profile`, `teeth_present`, `un_erupted`, `ie_missing`, `ie_extracted`, `ie_impacted`, `ie_supernumerary`, `ie_caries`, `ie_rct`, `ie_anomalies`, `left_molar`, `right_molar`, `left_canine`, `right_canine`, `overjet`, `overbite`, `crossbite`, `crowding_md`, `crowding_mx`, `spacing_mx`, `spacing_md`, `diagnosis`, `treatment_plan`, `length_active_treatment`, `retention`, `prognosis`, `consultation`, `charging`)" +
+			" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
 		stmt, err := repository.DBS.MysqlDb.Prepare(query)
 		if err != nil {
 			return err
@@ -299,6 +305,9 @@ func CreateMedicalHistory(request CreateMedicalHistoryStruct) error {
 			&request.TreatmentPlan,
 			&request.LengthActiveTreatment,
 			&request.Retention,
+			&request.Prognosis,
+			&request.Consultation,
+			&request.Charging,
 		)
 		if err != nil {
 			return err
