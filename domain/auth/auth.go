@@ -13,10 +13,17 @@ type UserLoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type UserLoginWithCodeRequest struct {
+	Tel     string `json:"tel" binding:"required"`
+	AppCode string `json:"appcode" binding:"required"`
+}
+
 type UserLoginInfo struct {
 	ID             int64                              `json:"id"`
 	FirstName      string                             `json:"fname"`
 	LastName       string                             `json:"lname"`
+	Password       string                             `json:"pass"`
+	AppCode        string                             `json:"appcode"`
 	Tel            string                             `json:"tel"`
 	UserGroupID    int64                              `json:"user_group_id"`
 	OrganizationID int64                              `json:"organization_id"`

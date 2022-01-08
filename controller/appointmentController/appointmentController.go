@@ -9,6 +9,7 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/domain/admission"
 	"gitlab.com/simateb-project/simateb-backend/domain/appointment"
 	"gitlab.com/simateb-project/simateb-backend/domain/caseType"
+	"gitlab.com/simateb-project/simateb-backend/domain/wallet"
 	"gitlab.com/simateb-project/simateb-backend/helper"
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	appointment2 "gitlab.com/simateb-project/simateb-backend/repository/appointment"
@@ -104,15 +105,31 @@ func (uc *AppointmentControllerStruct) Create(c *gin.Context) {
 func (uc *AppointmentControllerStruct) SendResult(c *gin.Context) {
 	staff := auth.GetStaffUser(c)
 	id := c.Param("id")
-	_, header, err := c.Request.FormFile("file")
-	if err != nil {
-		log.Println(err.Error(), "read file")
-		errorsHandler.GinErrorResponseHandler(c, err)
+	staffOrg := organizationController.GetOrganization(fmt.Sprintf("%d", staff.OrganizationID))
+	orgWallet := wallet.GetWallet(staffOrg.ID, "organization")
+	if orgWallet == nil {
+		errorsHandler.GinErrorResponseHandler(c, nil)
 		return
 	}
 	app, err := appointment.GetAppointmentById(id)
 	if err != nil {
 		log.Println(err.Error(), "get app")
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	price := app.Price
+	if orgWallet.Balance < price {
+		errorsHandler.GinErrorResponseHandler(c, nil)
+		return
+	}
+	res, _ := orgWallet.Decrease(price, false)
+	if !res {
+		errorsHandler.GinErrorResponseHandler(c, nil)
+		return
+	}
+	_, header, err := c.Request.FormFile("file")
+	if err != nil {
+		log.Println(err.Error(), "read file")
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
@@ -126,7 +143,6 @@ func (uc *AppointmentControllerStruct) SendResult(c *gin.Context) {
 			return
 		}
 	}
-	staffOrg := organizationController.GetOrganization(fmt.Sprintf("%d", staff.OrganizationID))
 	prof := "/photo"
 	switch staffOrg.ProfessionID {
 	case "3":
@@ -235,6 +251,7 @@ func (uc *AppointmentControllerStruct) Get(c *gin.Context) {
 	}
 	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.GetAppointmentQuery)
 	if err != nil {
+		log.Println(err.Error(), "err")
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
@@ -250,7 +267,10 @@ func (uc *AppointmentControllerStruct) Get(c *gin.Context) {
 		&appointment.Income,
 		&appointment.Status,
 		&appointment.UpdatedAt,
+		&appointment.UserFName,
+		&appointment.UserLName,
 		&appointment.UserID,
+		&appointment.UserGender,
 		&appointment.Price,
 	)
 	if err != nil {
@@ -262,6 +282,7 @@ func (uc *AppointmentControllerStruct) Get(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
+	appointment.Last = GetAppointmentLastPrescription(fmt.Sprintf("%d", appointment.ID))
 	appointment.User, _ = user.GetUserByID(appointment.UserID)
 	c.JSON(http.StatusOK, appointment)
 }
@@ -1079,7 +1100,7 @@ func acceptAppointment(id string, code string, price float64, request appointmen
 }
 
 func InsertLastAppointmentPrescription(id string, futurePrescription string, prescription string) bool {
-	count := getAppointmentLastPrescription(id)
+	count := getAppointmentLastPrescriptionCount(id)
 	if count > 0 {
 		return false
 	}
@@ -1100,7 +1121,7 @@ func InsertLastAppointmentPrescription(id string, futurePrescription string, pre
 	return true
 }
 
-func getAppointmentLastPrescription(id string) int {
+func getAppointmentLastPrescriptionCount(id string) int {
 	count := 0
 	query := "SELECT COUNT(*) count FROM `last_prescription` WHERE appointment_id = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
@@ -1116,6 +1137,30 @@ func getAppointmentLastPrescription(id string) int {
 		return count
 	}
 	return count
+}
+
+func GetAppointmentLastPrescription(id string) appointment.LastPrescription {
+	last := appointment.LastPrescription{}
+	query := "SELECT `prescription`, `future_prescription` FROM `last_prescription` WHERE appointment_id = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	result := stmt.QueryRow(id)
+	if err = result.Err(); err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	err = result.Scan(
+		&last.Prescription,
+		&last.FuturePrescription,
+	)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	return last
 }
 
 func calcRadiologyCasesPrice(cases []string, orgID int64) float64 {

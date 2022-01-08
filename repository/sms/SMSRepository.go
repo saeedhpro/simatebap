@@ -9,14 +9,12 @@ import (
 
 func SendSMS(sendSMSRequest sms.SendSMSRequest, staffID int64) (*string, error) {
 	var sent bool
-	sent, r := sendSMSRequest.SendSMS()
-	log.Println(sent)
+	sent, r, error := sendSMSRequest.SendSMS()
 	stmt, err := repository.DBS.MysqlDb.Prepare(mysqlQuery.CreateSMSQuery)
 	if err != nil {
 		log.Println(err.Error())
 		return r, err
 	}
-	defer stmt.Close()
 	result, err := stmt.Exec(
 		&sendSMSRequest.UserID,
 		staffID,
@@ -30,10 +28,14 @@ func SendSMS(sendSMSRequest sms.SendSMSRequest, staffID int64) (*string, error) 
 		log.Println(err.Error())
 		return r, err
 	}
-	_, err = result.LastInsertId()
+	res, err := result.LastInsertId()
+	log.Println(res)
 	if err != nil {
 		log.Println(err.Error())
 		return r, err
+	}
+	if error != nil {
+		return nil, error
 	}
 	return nil, nil
 }

@@ -171,7 +171,7 @@ func (pc *PaymentControllerStruct) GetPaymentList(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, error)
 		return
 	}
-	var payments []payment2.PaymentStruct
+	payments := []payment2.PaymentStruct{}
 	var payment payment2.PaymentStruct
 	for rows.Next() {
 		err = rows.Scan(
@@ -199,7 +199,7 @@ func (pc *PaymentControllerStruct) GetPaymentList(c *gin.Context) {
 		}
 		payments = append(payments, payment)
 	}
-	var total float64
+	total := 0.0
 	query = "SELECT SUM(payment.amount) total FROM payment LEFT JOIN user ON payment.user_id = user.id WHERE payment.user_id = ?"
 	stmt, err = repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
@@ -213,8 +213,6 @@ func (pc *PaymentControllerStruct) GetPaymentList(c *gin.Context) {
 	)
 	if err != nil {
 		log.Println(err.Error(), "error")
-		errorsHandler.GinErrorResponseHandler(c, error)
-		return
 	}
 	paymentList := payment2.PaymentListStruct{
 		Payments:     payments,
@@ -241,7 +239,7 @@ func (pc *PaymentControllerStruct) GetOrthodonticsList(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, error)
 		return
 	}
-	var payments []payment2.PaymentStruct
+	payments := []payment2.PaymentStruct{}
 	var payment payment2.PaymentStruct
 	for rows.Next() {
 		err = rows.Scan(
@@ -269,7 +267,7 @@ func (pc *PaymentControllerStruct) GetOrthodonticsList(c *gin.Context) {
 		}
 		payments = append(payments, payment)
 	}
-	var total float64
+	total := 0.0
 	query = "SELECT SUM(payment.amount) total FROM payment LEFT JOIN user ON payment.user_id = user.id WHERE payment.user_id = ?"
 	stmt, err = repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
@@ -283,8 +281,6 @@ func (pc *PaymentControllerStruct) GetOrthodonticsList(c *gin.Context) {
 	)
 	if err != nil {
 		log.Println(err.Error(), "error")
-		errorsHandler.GinErrorResponseHandler(c, error)
-		return
 	}
 	paymentList := payment2.PaymentListStruct{
 		Payments:     payments,

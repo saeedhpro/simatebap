@@ -4,7 +4,7 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/domain/appointment"
 	"gitlab.com/simateb-project/simateb-backend/domain/organization"
 	sms2 "gitlab.com/simateb-project/simateb-backend/domain/sms"
-	"gitlab.com/simateb-project/simateb-backend/repository/wallet"
+	"gitlab.com/simateb-project/simateb-backend/repository/pushe"
 )
 
 type OrganizationPaginationInfo struct {
@@ -61,16 +61,17 @@ type OrganizationWorkTimeStruct struct {
 	WorkHourEnd   string `json:"work_hour_end"`
 }
 
-type WalletHistoriesPaginationInfo struct {
-	Data        []wallet.WalletHistoryStruct `json:"data"`
-	NextPage    int                          `json:"next_page"`
-	PrevPage    int                          `json:"prev_page"`
-	Page        int                          `json:"page"`
-	HasNextPage bool                         `json:"has_next_page"`
-	PagesCount  int                          `json:"pages_count"`
-}
 type SMSPaginationInfo struct {
 	Data        []sms2.SMS `json:"data"`
+	NextPage    int        `json:"next_page"`
+	PrevPage    int        `json:"prev_page"`
+	Page        int        `json:"page"`
+	HasNextPage bool       `json:"has_next_page"`
+	PagesCount  int        `json:"pages_count"`
+}
+
+type NotificationPaginationInfo struct {
+	Data        []pushe.Notification `json:"data"`
 	NextPage    int        `json:"next_page"`
 	PrevPage    int        `json:"prev_page"`
 	Page        int        `json:"page"`

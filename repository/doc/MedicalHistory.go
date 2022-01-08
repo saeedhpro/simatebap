@@ -21,14 +21,19 @@ type DocStruct struct {
 }
 
 type CreateDocStruct struct {
-	UserID         int64 `json:"user_id"`
-	OrganizationID int64 `json:"organization_id"`
+	UserID         int64  `json:"user_id"`
+	OrganizationID int64  `json:"organization_id"`
 	Name           string `json:"name"`
 	Path           string `json:"path"`
 	UserDesc       string `json:"user_desc"`
 	DoctorDesc     string `json:"doctor_desc"`
 	Type           string `json:"type"`
-	ProfessionID   int64 `json:"profession_id"`
+	ProfessionID   int64  `json:"profession_id"`
+}
+
+type UpdateDocStruct struct {
+	UserDesc   string `json:"user_desc"`
+	DoctorDesc string `json:"doctor_desc"`
 }
 
 func GetUserDocs(userID string, organizationID string) ([]DocStruct, error) {
@@ -50,8 +55,8 @@ func GetUserDocs(userID string, organizationID string) ([]DocStruct, error) {
 			&doc.ID,
 			&doc.Name,
 			&doc.Path,
-			&doc.UserDesc,
 			&doc.DoctorDesc,
+			&doc.UserDesc,
 			&doc.Type,
 		)
 		if err != nil {
@@ -101,4 +106,46 @@ func DeleteDoc(id string) error {
 		return err
 	}
 	return nil
+}
+
+func UpdateDoc(id string, doctorDesc string, userDesc string) error {
+	query := "UPDATE `docs` SET `doctor_desc`= ?,`user_desc`= ? WHERE id = ? "
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
+	_, err = stmt.Exec(doctorDesc, userDesc, id)
+	if err != nil {
+		log.Println(err.Error())
+		return err
+	}
+	return nil
+}
+func GetDoc(id string) (DocStruct, error) {
+	doc := DocStruct{}
+	query := "SELECT id, ifnull(name, '') name, ifnull(path, '') path, ifnull(doctor_desc, '') doctor_desc, ifnull(user_desc, '') user_desc, ifnull(type, '') type FROM docs WHERE id = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "prepare")
+		return doc, err
+	}
+	res := stmt.QueryRow(id)
+	if err := res.Err(); err != nil {
+		log.Println(err.Error(), "prepare")
+		return doc, err
+	}
+	err = res.Scan(
+		&doc.ID,
+		&doc.Name,
+		&doc.Path,
+		&doc.DoctorDesc,
+		&doc.UserDesc,
+		&doc.Type,
+	)
+	if err != nil {
+		log.Println(err.Error(), " :err: ")
+		return doc, err
+	}
+	return doc, nil
 }

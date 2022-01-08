@@ -12,6 +12,7 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/controller/organizationController"
 	"gitlab.com/simateb-project/simateb-backend/controller/paymentController"
 	"gitlab.com/simateb-project/simateb-backend/controller/smsController"
+	"gitlab.com/simateb-project/simateb-backend/controller/transferController"
 	"gitlab.com/simateb-project/simateb-backend/controller/uploadController"
 	"gitlab.com/simateb-project/simateb-backend/controller/userController"
 	userOrganizationPrice "gitlab.com/simateb-project/simateb-backend/controller/userOrganizationPriceController"
@@ -46,14 +47,17 @@ func Run(Port string) {
 	ctc := caseTypeController.NewCaseTypeController(appr)
 	hc := HoldayController.NewHolidayController()
 	smsc := smsController.NewSMSController()
+	notifc := smsController.NewNotificationController()
 	pc := paymentController.NewPaymentController()
 	caseC := casesController.NewCasesController()
 	cpc := casePriceController.NewCasePriceController()
 	uopc := userOrganizationPrice.NewUserOrganizationPriceController()
 	uploadC := uploadController.NewUploadController()
+	tc := transferController.NewTransferController()
 
 	{
 		v1.POST("/auth/login", ac.Login)
+		v1.POST("/auth/login/code", ac.LoginWithCode)
 	}
 
 	{
@@ -68,6 +72,8 @@ func Run(Port string) {
 	{
 		v1.POST("/organizations", middleware.GinJwtAuth(oc.Create, true, false))
 		v1.GET("/organizations", middleware.GinJwtAuth(oc.GetList, true, false))
+		v1.POST("/organizations/items", middleware.GinJwtAuth(oc.DeleteItems, true, false))
+		v1.GET("/organizations/:id/holidays", middleware.GinJwtAuth(hc.GetList, true, false))
 		v1.GET("/organizations/:id/radios", middleware.GinJwtAuth(appc.GetRadiosAppointmentList, true, false))
 		v1.GET("/organizations/:id/photos", middleware.GinJwtAuth(appc.GetPhotosAppointmentList, true, false))
 		v1.GET("/organizations/:id/offs", middleware.GinJwtAuth(appc.GetOffsAppointmentList, true, false))
@@ -77,6 +83,7 @@ func Run(Port string) {
 		v1.POST("/organizations/:id/work-time", middleware.GinJwtAuth(oc.UpdateOrganizationWorkTime, true, false))
 		v1.PUT("/organizations/:id", middleware.GinJwtAuth(oc.Update, true, false))
 		v1.GET("/organizations/:id/appointments", middleware.GinJwtAuth(oc.GetOrganizationAppointments, true, false))
+		v1.GET("/organizations/:id/reports", middleware.GinJwtAuth(oc.GetOrganizationReports, true, false))
 		v1.GET("/organizations/:id/images", middleware.GinJwtAuth(oc.GetOrganizationImages, true, false))
 		v1.POST("/organizations/:id/images", middleware.GinJwtAuth(oc.UploadOrganizationImage, true, false))
 		v1.GET("/organizations/:id/about", middleware.GinJwtAuth(oc.GetOrganizationAbout, true, false))
@@ -91,6 +98,9 @@ func Run(Port string) {
 		v1.GET("/organizations/:id/users", middleware.GinJwtAuth(oc.GetUsers, true, false))
 		v1.GET("/organizations/:id/employees", middleware.GinJwtAuth(oc.GetEmployees, true, false))
 		v1.GET("/organizations/:id/wallet", middleware.GinJwtAuth(oc.GetOrganizationWallet, true, false))
+		v1.GET("/organizations/:id/wallet/histories", middleware.GinJwtAuth(oc.GetOrganizationWalletHistories, true, false))
+		v1.GET("/organizations/:id/wallet/histories/sum", middleware.GinJwtAuth(oc.GetOrganizationWalletHistoriesSum, true, false))
+		v1.GET("/organizations/:id/wallet/histories/days", middleware.GinJwtAuth(oc.GetOrganizationWalletHistoriesDays, true, false))
 		v1.POST("/organizations/:id/wallet/increase", middleware.GinJwtAuth(oc.IncreaseOrganizationWallet, true, false))
 		v1.POST("/organizations/:id/wallet/decrease", middleware.GinJwtAuth(oc.DecreaseOrganizationWallet, true, false))
 		v1.POST("/organizations/:id/wallet/set", middleware.GinJwtAuth(oc.SetOrganizationWallet, true, false))
@@ -110,6 +120,7 @@ func Run(Port string) {
 		v1.GET("/users/last-patient-login", middleware.GinJwtAuth(uc.GetLastLoginPatients, true, false))
 		v1.POST("/users/items", middleware.GinJwtAuth(uc.DeleteItems, true, false))
 		v1.PUT("/users/:id/code", middleware.GinJwtAuth(uc.CreateCode, true, false))
+		v1.GET("/users/:id/transfers", middleware.GinJwtAuth(tc.GetUserTransferList, true, false))
 		v1.GET("/users/:id/docs", middleware.GinJwtAuth(uc.GetUserDocs, true, false))
 		v1.POST("/users/:id/docs", middleware.GinJwtAuth(uc.SendDoc, true, false))
 		v1.GET("/users/:id", middleware.GinJwtAuth(uc.Get, true, false))
@@ -129,7 +140,12 @@ func Run(Port string) {
 		v1.GET("/users/:id/payments", middleware.GinJwtAuth(pc.GetPaymentList, true, false))
 		v1.GET("/users/:id/orthodontics", middleware.GinJwtAuth(uc.GetOrthodonticsList, true, false))
 		v1.POST("/users/:id/orthodontics", middleware.GinJwtAuth(uc.CreateOrthodonticsList, true, false))
+		v1.PUT("/docs/:id", middleware.GinJwtAuth(uc.UpdateDoc, true, false))
 		v1.DELETE("/docs/:id", middleware.GinJwtAuth(uc.DeleteDoc, true, false))
+	}
+
+	{
+		v1.GET("/transfers/:id", middleware.GinJwtAuth(tc.Get, true, false))
 	}
 
 	{
@@ -185,6 +201,13 @@ func Run(Port string) {
 	}
 
 	{
+		v1.GET("/notifications", middleware.GinJwtAuth(notifc.GetList, true, false))
+		v1.POST("/notifications", middleware.GinJwtAuth(notifc.Create, true, false))
+		v1.GET("/notifications/:id", middleware.GinJwtAuth(notifc.Get, true, false))
+		v1.POST("/notifications/items", middleware.GinJwtAuth(notifc.Delete, true, false))
+	}
+
+	{
 		v1.GET("/operations", middleware.GinJwtAuth(appc.GetOperationList, true, false))
 	}
 
@@ -200,7 +223,7 @@ func Run(Port string) {
 		v1.POST("/admin/users/:id/wallet/decrease", middleware.GinJwtAuth(uc.DecreaseUserWallet, true, false))
 		v1.POST("/admin/users/:id/wallet/set", middleware.GinJwtAuth(uc.SetUserWallet, true, false))
 
-		v1.GET("/admin/holidays", middleware.GinJwtAuth(hc.GetListForAdmin, true, false))
+		v1.GET("/admin/holidays", middleware.GinJwtAuth(hc.GetList, true, false))
 		v1.POST("/admin/holidays", middleware.GinJwtAuth(hc.Create, true, false))
 		v1.GET("/admin/holidays/:id", middleware.GinJwtAuth(hc.Get, true, false))
 		v1.PUT("/admin/holidays/:id", middleware.GinJwtAuth(hc.Update, true, false))
@@ -231,6 +254,8 @@ func Run(Port string) {
 		v1.GET("/admin/cases/:id", middleware.GinJwtAuth(caseC.Get, true, false))
 		v1.PUT("/admin/cases/:id", middleware.GinJwtAuth(caseC.Update, true, false))
 
+		v1.POST("/admin/histories/accept", middleware.GinJwtAuth(uc.AcceptOrRejectWalletHistories, true, false))
+		v1.GET("/admin/histories", middleware.GinJwtAuth(uc.GetWalletHistoriesForAdmin, true, false))
 	}
 
 	fmt.Println(engine.Run(fmt.Sprintf(":%s", Port)))

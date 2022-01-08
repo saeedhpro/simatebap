@@ -1,7 +1,7 @@
 package mysqlQuery
 
 const (
-	LoginQuery                           = "SELECT id, fname, lname, tel, user_group_id, organization_id FROM user WHERE tel = ?"
+	LoginQuery                           = "SELECT id, fname, lname, tel, user_group_id, organization_id, pass, appcode FROM user WHERE tel = ?"
 	CreateOrganizationQuery              = "INSERT INTO `organization`(`name`, `known_as`, `profession_id`, `logo`,`phone`, `phone1`, `staff_id`, `info`, `case_types`, `sms_price`, `sms_credit`, `website`, `instagram`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
 	GetSimpleOrganizationQuery           = "SELECT id, ifnull(name, ''), profession_id FROM organization WHERE id = ?"
 	GetAdminUsersQuery                   = "SELECT id, ifnull(fname, ''), ifnull(lname, ''), ifnull(tel, ''), ifnull(user_group_id, ''), ifnull(created, ''), ifnull(last_login, ''), ifnull(birth_date, '') FROM user LIMIT 10 OFFSET ?"
@@ -15,7 +15,7 @@ const (
 	ChangePasswordQuery                  = "UPDATE `user` SET `pass` = ? WHERE id = ?"
 	GetOrganizationRelations             = "SELECT rel_organization_id FROM rel_organization where organization_id = ?"
 	GetAppointmentListQuery              = "SELECT appointment.id id, appointment.case_type case_type, appointment.is_vip is_vip, appointment.start_at start_at, appointment.user_id user_id, appointment.info info, appointment.income income, appointment.status appointment_status,  appointment.updated_at updated_at, user.fname user_fname, user.lname user_lname, user.id user_id, user.gender user_gender from appointment LEFT JOIN user on appointment.user_id = user.id WHERE organization_id = ? and start_date >= ? and start_date < ?"
-	GetAppointmentQuery                  = "SELECT appointment.id id, appointment.case_type case_type, appointment.is_vip is_vip, appointment.start_at start_at, appointment.user_id user_id, appointment.info info, appointment.income income, appointment.status appointment_status,  appointment.updated_at updated_at, user.fname user_fname, user.lname user_lname, user.id user_id, user.gender user_gender, appointment.price price, from appointment LEFT JOIN user on appointment.user_id = user.id WHERE id = ?"
+	GetAppointmentQuery                  = "SELECT appointment.id id, appointment.case_type case_type, appointment.is_vip is_vip, appointment.start_at start_at, appointment.user_id user_id, appointment.info info, appointment.income income, appointment.status appointment_status,  appointment.updated_at updated_at, user.fname user_fname, user.lname user_lname, user.id user_id, user.gender user_gender, appointment.price price from appointment LEFT JOIN user on appointment.user_id = user.id WHERE appointment.id = ?"
 	GetCaseTypesListForOrganizationQuery = "SELECT id, name, organization_id, duration, is_limited, limitation FROM case_type WHERE organization_id = ?"
 	GetOrganizationOperationListQuery    = "SELECT id, user_id, start_at, info, income, case_type FROM `appointment` WHERE `case_type` = 'جراحی' and organization_id = ? AND start_at between ? AND ? ORDER BY `case_type` DESC"
 	GetOrganizationAppointmentListQuery  = "SELECT id, user_id, start_at, info, income, case_type FROM `appointment` WHERE status in (?) and organization_id = ? AND start_at between ? AND ? ORDER BY `id` DESC"

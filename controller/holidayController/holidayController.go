@@ -7,7 +7,6 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/domain/holiday"
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
-	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
 	"log"
 	"net/http"
@@ -100,19 +99,21 @@ func (uc *HolidayControllerStruct) Get(c *gin.Context) {
 
 func (uc *HolidayControllerStruct) GetList(c *gin.Context) {
 	startAt := c.Query("start_date")
-	endAt := c.Query("end_date")
-	GetOrganizationHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name,'') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id WHERE holiday.organization_id = ? "
+	//endAt := c.Query("end_date")
+	id := c.Param("id")
+	query := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name,'') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id WHERE (holiday.organization_id = ? OR holiday.organization_id IS NULL ) "
 	var values []interface{}
+	values = append(values, id)
 	if startAt != "" && startAt != "null"  {
-		GetOrganizationHolidaysQuery += " AND DATE(holiday.hdate) >= ? "
+		query += " AND DATE(holiday.hdate) >= ? "
 		values = append(values, startAt)
 	}
-	if endAt != "" && endAt != "null"  {
-		GetOrganizationHolidaysQuery += " AND DATE(holiday.hdate) <= ? "
-		values = append(values, endAt)
-	}
-	GetOrganizationHolidaysQuery += " ORDER BY hdate ASC"
-	stmt, err := repository.DBS.MysqlDb.Prepare(GetOrganizationHolidaysQuery)
+	//if endAt != "" && endAt != "null"  {
+	//	query += " AND DATE(holiday.hdate) <= ? "
+	//	values = append(values, endAt)
+	//}
+	query += " ORDER BY hdate DESC"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
@@ -120,8 +121,6 @@ func (uc *HolidayControllerStruct) GetList(c *gin.Context) {
 	}
 	holidays := []holiday.HolidayInfo{}
 	var hd holiday.HolidayInfo
-	user := auth.GetStaffUser(c)
-	values = append(values, user.OrganizationID)
 	rows, err := stmt.Query(values...)
 	if err != nil {
 		log.Println(err.Error())
@@ -151,8 +150,8 @@ func (uc *HolidayControllerStruct) GetListForAdmin(c *gin.Context) {
 	if page == "" {
 		page = "1"
 	}
-	GetAdminHolidaysQuery := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name, '') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id LIMIT 10 OFFSET ?"
-	stmt, err := repository.DBS.MysqlDb.Prepare(GetAdminHolidaysQuery)
+	query := "SELECT holiday.id id, holiday.title, holiday.hdate, ifnull(holiday.organization_id, 0) organization_id, ifnull(organization.name, '') organization_name FROM holiday LEFT JOIN organization ON holiday.organization_id = organization.id LIMIT 10 OFFSET ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return

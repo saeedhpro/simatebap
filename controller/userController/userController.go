@@ -30,6 +30,8 @@ import (
 type UserControllerInterface interface {
 	Create(c *gin.Context)
 	CreateUserWalletHistories(c *gin.Context)
+	AcceptOrRejectWalletHistories(c *gin.Context)
+	GetWalletHistoriesForAdmin(c *gin.Context)
 	Own(c *gin.Context)
 	Get(c *gin.Context)
 	GetList(c *gin.Context)
@@ -41,6 +43,7 @@ type UserControllerInterface interface {
 	CreateCode(c *gin.Context)
 	SendDoc(c *gin.Context)
 	DeleteDoc(c *gin.Context)
+	UpdateDoc(c *gin.Context)
 	GetUserDocs(c *gin.Context)
 	ChangePassword(c *gin.Context)
 	GetUserAppointmentList(c *gin.Context)
@@ -132,8 +135,27 @@ func (uc *UserControllerStruct) CreateUserWalletHistories(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, errors)
 		return
 	}
-	staff := auth.GetStaffUser(c)
-	result, _ := user.CreateWithdraw(request, staff.UserID)
+	result, _ := user.CreateWithdraw(request)
+	c.JSON(200, result)
+}
+
+func (uc *UserControllerStruct) AcceptOrRejectWalletHistories(c *gin.Context) {
+	var request user.AcceptOrRejectWithdrawRequest
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	result, _ := user.AcceptOrRejectWithdraw(request)
+	c.JSON(200, result)
+}
+
+func (uc *UserControllerStruct) GetWalletHistoriesForAdmin(c *gin.Context) {
+	page := c.Query("page")
+	if page == "" {
+		 page = "1"
+	}
+	result, _ := user.GetWalletHistoriesForAdmin(page)
 	c.JSON(200, result)
 }
 
@@ -170,11 +192,11 @@ func (uc *UserControllerStruct) Get(c *gin.Context) {
 }
 
 func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
-	getUsersQuery := "SELECT user.id id, ifnull(user.fname, '') fname, ifnull(user.lname, '') lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (?)"
 	group := c.Query("group")
 	if group == "" {
 		group = "1,2,3,4,5,6"
 	}
+	getUsersQuery := "SELECT user.id id, ifnull(user.fname, '') fname, ifnull(user.lname, '') lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id IN (" + group + ")"
 	page := c.Query("page")
 	if page == "" {
 		page = "1"
@@ -200,7 +222,7 @@ func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
 	}
 	users := []organization.OrganizationUser{}
 	var user organization.OrganizationUser
-	rows, err := stmt.Query(group, offset)
+	rows, err := stmt.Query(offset)
 	if err != nil {
 		log.Println(err.Error())
 		errorsHandler.GinErrorResponseHandler(c, err)
@@ -252,14 +274,14 @@ func (uc *UserControllerStruct) GetListForAdmin(c *gin.Context) {
 }
 
 func (uc *UserControllerStruct) GetAdminList(c *gin.Context) {
-	getUsersQuery := "SELECT user.id id, user.fname fname, user.lname lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user.user_group_id = 2 "
+	getUsersQuery := "SELECT user.id id, user.fname fname, user.lname lname, user.last_login last_login, user.created created, user.tel tel, user.user_group_id user_group_id, user_group.name user_group_name, user.birth_date birth_date, organization.id organization_id, organization.name organization_name, ifnull(user.relation, '') relation, ifnull(user.description, '') description FROM (user LEFT JOIN organization ON user.organization_id = organization.id) LEFT JOIN user_group ON user.user_group_id = user_group.id WHERE user_group_id = 2"
 	page := c.Query("page")
 	if page == "" {
 		page = "1"
 	}
 	q := c.Query("q")
 	if q != "" && q != "null" && q != "undefined" {
-		getUsersQuery += " LIKE '%" + q + "%' "
+		getUsersQuery += " user.fname LIKE '%" + q + "%' "
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
@@ -545,9 +567,34 @@ func (uc *UserControllerStruct) GetUserAppointmentList(c *gin.Context) {
 			c.JSON(http.StatusOK, appointments)
 			return
 		}
+		appointment.Last = GetAppointmentLastPrescription(fmt.Sprintf("%d", appointment.ID))
 		appointments = append(appointments, appointment)
 	}
 	c.JSON(http.StatusOK, appointments)
+}
+func GetAppointmentLastPrescription(id string) appointment2.LastPrescription {
+	last := appointment2.LastPrescription{}
+	query := "SELECT `prescription`, `future_prescription` FROM `last_prescription` WHERE appointment_id = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	result := stmt.QueryRow(id)
+	if err = result.Err(); err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	err = result.Scan(
+		last.Prescription,
+		last.FuturePrescription,
+	)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	log.Println(last)
+	return last
 }
 
 func (uc *UserControllerStruct) GetUserAppointmentResultList(c *gin.Context) {
@@ -649,6 +696,7 @@ func (uc *UserControllerStruct) GetUserAppointmentResultList(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, appointments)
 }
+
 func GetResultImages(id int64, prof string, host string) []string {
 	logos := []string{}
 	location := fmt.Sprintf("./images/results/%d", id)
@@ -868,6 +916,7 @@ func (uc *UserControllerStruct) DeleteItems(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, nil)
 }
+
 func (uc *UserControllerStruct) CreateCode(c *gin.Context) {
 	var updateUserQuery = "UPDATE `user` SET `appcode` = ? WHERE `id` = ?"
 	id := c.Param("id")
@@ -921,6 +970,24 @@ func (uc *UserControllerStruct) DeleteDoc(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, nil)
+}
+
+func (uc *UserControllerStruct) UpdateDoc(c *gin.Context) {
+	id := c.Param("id")
+	request := doc.UpdateDocStruct{}
+	if errors := c.ShouldBindJSON(&request); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	err := doc.UpdateDoc(id, request.DoctorDesc, request.UserDesc)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	doc, _ := doc.GetDoc(id)
+	c.JSON(http.StatusOK, doc)
 }
 
 func (uc *UserControllerStruct) GetUserDocs(c *gin.Context) {
@@ -995,7 +1062,7 @@ func (uc *UserControllerStruct) GetUserWalletHistories(c *gin.Context) {
 		})
 		return
 	}
-	histories, _ := user.GetUserAllWalletHistories(uID, start_date, end_date, q, page)
+	histories, _ := wallet.GetUserAllWalletHistories(uID, start_date, end_date, q, page)
 	c.JSON(200, histories)
 }
 
@@ -1023,7 +1090,7 @@ func (uc *UserControllerStruct) GetUserWalletHistoriesSum(c *gin.Context) {
 		})
 		return
 	}
-	sum, _ = user.GetUserWalletHistoriesSum(uID, start_date, end_date)
+	sum, _ = wallet.GetUserWalletHistoriesSum(uID, start_date, end_date)
 	c.JSON(200, sum)
 }
 
@@ -1050,7 +1117,7 @@ func (uc *UserControllerStruct) GetUserWalletHistoriesDays(c *gin.Context) {
 		})
 		return
 	}
-	histories, _ = user.GetUserWalletHistoriesDays(uID, start_date, end_date)
+	histories, _ = wallet.GetUserWalletHistoriesDays(uID, start_date, end_date)
 	c.JSON(200, histories)
 }
 

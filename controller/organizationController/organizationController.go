@@ -6,16 +6,20 @@ import (
 	"github.com/gin-gonic/gin"
 	appointment2 "gitlab.com/simateb-project/simateb-backend/domain/appointment"
 	"gitlab.com/simateb-project/simateb-backend/domain/organization"
+	sms2 "gitlab.com/simateb-project/simateb-backend/domain/sms"
 	wallet2 "gitlab.com/simateb-project/simateb-backend/domain/wallet"
 	"gitlab.com/simateb-project/simateb-backend/helper"
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
+	report2 "gitlab.com/simateb-project/simateb-backend/repository/report"
 	"gitlab.com/simateb-project/simateb-backend/repository/vip"
+	"gitlab.com/simateb-project/simateb-backend/repository/wallet"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
 	"gitlab.com/simateb-project/simateb-backend/utils/pagination"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,10 +31,12 @@ import (
 type OrganizationControllerInterface interface {
 	Create(c *gin.Context)
 	Get(c *gin.Context)
+	DeleteItems(c *gin.Context)
 	Update(c *gin.Context)
 	GetList(c *gin.Context)
 	GetListAll(c *gin.Context)
 	GetOrganizationAppointments(c *gin.Context)
+	GetOrganizationReports(c *gin.Context)
 	UploadOrganizationImage(c *gin.Context)
 	UpdateOrganizationAbout(c *gin.Context)
 	GetOrganizationImages(c *gin.Context)
@@ -41,6 +47,9 @@ type OrganizationControllerInterface interface {
 	GetUsers(c *gin.Context)
 	GetEmployees(c *gin.Context)
 	GetOrganizationWallet(c *gin.Context)
+	GetOrganizationWalletHistories(c *gin.Context)
+	GetOrganizationWalletHistoriesSum(c *gin.Context)
+	GetOrganizationWalletHistoriesDays(c *gin.Context)
 	IncreaseOrganizationWallet(c *gin.Context)
 	DecreaseOrganizationWallet(c *gin.Context)
 	SetOrganizationWallet(c *gin.Context)
@@ -165,6 +174,51 @@ func setOrganizationRelations(id int64, radiologies []organization.RelOrganizati
 	if error != nil {
 		log.Println(error.Error())
 	}
+}
+
+func (oc *OrganizationControllerStruct) DeleteItems(c *gin.Context) {
+	//staff := auth.GetStaffUser(c)
+	//if staff.UserGroupID != 2 {
+	//	c.JSON(403, gin.H{})
+	//	return
+	//}
+	query := "DELETE FROM `organization` WHERE id in ("
+	var deleteSMSRequest sms2.DeleteSMSRequest
+	if errors := c.ShouldBindJSON(&deleteSMSRequest); errors != nil {
+		log.Println(errors.Error())
+		errorsHandler.GinErrorResponseHandler(c, errors)
+		return
+	}
+	if len(deleteSMSRequest.IDs) == 0 {
+		c.JSON(http.StatusOK, nil)
+		return
+	}
+	var values []interface{}
+	for i := 0; i < len(deleteSMSRequest.IDs); i++ {
+		values = append(values, deleteSMSRequest.IDs[i])
+		if i != len(deleteSMSRequest.IDs)-1 {
+			query += "?,"
+		} else {
+			query += "?"
+		}
+	}
+	query += ")"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	log.Println(query, "q")
+	_, err = stmt.Exec(
+		values...,
+	)
+	if err != nil {
+		log.Println(err.Error())
+		errorsHandler.GinErrorResponseHandler(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, nil)
 }
 
 func (oc *OrganizationControllerStruct) Get(c *gin.Context) {
@@ -533,12 +587,17 @@ func (oc *OrganizationControllerStruct) GetOrganizationAppointments(c *gin.Conte
 	orgID := c.Param("id")
 	page := c.Query("page")
 	q := c.Query("q")
+	ct := c.Query("case")
 	startAt := c.Query("start_at")
 	endAt := c.Query("end_at")
 	var values []interface{}
 	values = append(values, orgID)
 	if q != "" && q != "null" && q != "undefined" {
 		query += " AND (user.fname LIKE '%" + q + "%' OR user.lname LIKE '%" + q + "%' ) "
+	}
+	if ct != "" && ct != "null" && ct != "undefined" {
+		query += " AND appointment.case_type = ? "
+		values = append(values, ct)
 	}
 	if startAt != "" && startAt != "null" && startAt != "undefined" {
 		query += " AND start_at >= ?"
@@ -621,6 +680,7 @@ func (oc *OrganizationControllerStruct) GetOrganizationAppointments(c *gin.Conte
 			c.JSON(http.StatusOK, paginated)
 			return
 		}
+		appointment.Last = GetAppointmentLastPrescription(fmt.Sprintf("%d", appointment.ID))
 		appointments = append(appointments, appointment)
 	}
 	p, err := strconv.Atoi(page)
@@ -632,6 +692,92 @@ func (oc *OrganizationControllerStruct) GetOrganizationAppointments(c *gin.Conte
 		PagesCount: count,
 	}
 	c.JSON(http.StatusOK, paginated)
+}
+
+func (oc *OrganizationControllerStruct) GetOrganizationReports(c *gin.Context) {
+	report := report2.Report{}
+	getAbundanceReport(&report)
+	getGenderReport(&report)
+	c.JSON(http.StatusOK, report)
+}
+
+func getAbundanceReport(report *report2.Report)  {
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+	for i := 0; i < 6; i++ {
+		report.Abundance = append(report.Abundance, (r1.Intn(25) * 3)+ 10)
+	}
+}
+
+func getGenderReport(report *report2.Report)  {
+	gender := report2.Gender{}
+	query := "SELECT COUNT(*) male FROM `user` WHERE `gender` = 'MALE' AND `user_group_id` = 1"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		report.Gender = gender
+		return
+	}
+	result := stmt.QueryRow()
+	if err = result.Err(); err != nil {
+		log.Println(err.Error(), "err")
+		report.Gender = gender
+		return
+	}
+	err = result.Scan(
+		&gender.Male,
+	)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		report.Gender = gender
+		return
+	}
+	query = "SELECT COUNT(*) female FROM `user` WHERE `gender` = 'FEMALE' AND `user_group_id` = 1"
+	stmt, err = repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		report.Gender = gender
+		return
+	}
+	result = stmt.QueryRow()
+	if err = result.Err(); err != nil {
+		log.Println(err.Error(), "err")
+		report.Gender = gender
+		return
+	}
+	err = result.Scan(
+		&gender.Female,
+	)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		report.Gender = gender
+		return
+	}
+	report.Gender = gender
+}
+
+func GetAppointmentLastPrescription(id string) appointment2.LastPrescription {
+	last := appointment2.LastPrescription{}
+	query := "SELECT `prescription`, `future_prescription` FROM `last_prescription` WHERE appointment_id = ?"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	result := stmt.QueryRow(id)
+	if err = result.Err(); err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	err = result.Scan(
+		&last.Prescription,
+		&last.FuturePrescription,
+	)
+	if err != nil {
+		log.Println(err.Error(), "err")
+		return last
+	}
+	return last
 }
 
 func (oc *OrganizationControllerStruct) GetOrganizationWorkTime(c *gin.Context) {
@@ -1158,7 +1304,7 @@ func (oc *OrganizationControllerStruct) GetOrganizationScheduleList(c *gin.Conte
 		})
 		return
 	}
-	getOrganizationScheduleQuery := "SELECT id, doctor_count, start_at, end_at FROM `vip_schedule` WHERE organization_id = ?"
+	getOrganizationScheduleQuery := "SELECT id, doctor_count, site_count, app_count, start_at, end_at FROM `vip_schedule` WHERE organization_id = ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(getOrganizationScheduleQuery)
 	if err != nil {
 		log.Println(err.Error())
@@ -1177,6 +1323,8 @@ func (oc *OrganizationControllerStruct) GetOrganizationScheduleList(c *gin.Conte
 		err := rows.Scan(
 			&vip.ID,
 			&vip.DoctorCount,
+			&vip.SiteCount,
+			&vip.AppCount,
 			&vip.StartAt,
 			&vip.EndAt,
 		)
@@ -1380,7 +1528,29 @@ func GetGroup(id int64) *organization.UserGroup {
 }
 
 func (oc *OrganizationControllerStruct) GetOrganizationWallet(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(500, gin.H{
+			"message": "آی دی صحیح نیست",
+		})
+		return
+	}
+	oID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+	wallet := wallet2.GetWallet(oID, "organization")
+	c.JSON(200, wallet)
+}
+func (oc *OrganizationControllerStruct) GetOrganizationWalletHistories(c *gin.Context) {
 	userID := c.Param("id")
+	start_date := c.Query("start_date")
+	end_date := c.Query("end_date")
+	page := c.Query("page")
+	q := c.Query("q")
 	if userID == "" {
 		c.JSON(500, gin.H{
 			"message": "آی دی صحیح نیست",
@@ -1394,8 +1564,63 @@ func (oc *OrganizationControllerStruct) GetOrganizationWallet(c *gin.Context) {
 		})
 		return
 	}
-	wallet := wallet2.GetWallet(uID, "organization")
-	c.JSON(200, wallet)
+	histories, _ := wallet.GetOrganizationAllWalletHistories(uID, start_date, end_date, q, page)
+	c.JSON(200, histories)
+}
+
+func (oc *OrganizationControllerStruct) GetOrganizationWalletHistoriesSum(c *gin.Context) {
+	userID := c.Param("id")
+	start_date := c.Query("start_date")
+	end_date := c.Query("end_date")
+	if userID == "" {
+		c.JSON(500, gin.H{
+			"message": "آی دی صحیح نیست",
+		})
+		return
+	}
+	var sum int64
+	sum = 0
+	if start_date == "" || end_date == "" || start_date == "null" || end_date == "null" {
+		c.JSON(200, gin.H{
+			"date": sum,
+		})
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+	sum, _ = wallet.GetOrganizationWalletHistoriesSum(uID, start_date, end_date)
+	c.JSON(200, sum)
+}
+
+func (oc *OrganizationControllerStruct) GetOrganizationWalletHistoriesDays(c *gin.Context) {
+	userID := c.Param("id")
+	start_date := c.Query("start_date")
+	end_date := c.Query("end_date")
+	if userID == "" {
+		c.JSON(500, gin.H{
+			"message": "آی دی صحیح نیست",
+		})
+		return
+	}
+	histories := []wallet.WalletHistoryStruct{}
+	if start_date == "" || end_date == "" || start_date == "null" || end_date == "null" {
+		c.JSON(200, gin.H{
+			"date": histories,
+		})
+	}
+	uID, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+	histories, _ = wallet.GetOrganizationWalletHistoriesDays(uID, start_date, end_date)
+	c.JSON(200, histories)
 }
 
 func (oc *OrganizationControllerStruct) IncreaseOrganizationWallet(c *gin.Context) {
@@ -1415,6 +1640,10 @@ func (oc *OrganizationControllerStruct) IncreaseOrganizationWallet(c *gin.Contex
 		return
 	}
 	wallet := wallet2.GetWallet(uID, "organization")
+	if wallet == nil {
+		c.JSON(400, 0)
+		return
+	}
 	result, balance := wallet.Increase(request.Amount)
 	if result {
 		c.JSON(200, balance)
@@ -1526,6 +1755,7 @@ func (oc *OrganizationControllerStruct) CreateOrganizationSchedule(c *gin.Contex
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
+	log.Println(values...)
 	res, error := stmt.Exec(values...)
 	if error != nil {
 		log.Println(error.Error())
