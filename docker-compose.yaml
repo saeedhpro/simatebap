@@ -1,0 +1,65 @@
+version: "3"
+
+services:
+  backend:
+    container_name: backend_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: on-failure
+    depends_on:
+      - mysql
+    networks:
+      - backend
+    environment:
+      - MYSQL_ROOT_HOST=mysql
+      - MYSQL_USER=newsimateb
+      - MYSQL_PASSWORD=newsimateb
+      - MYSQL_DATABASE=newsimateb
+      - MYSQL_ROOT_PASSWORD=newsimateb
+    ports:
+      - "8000:8000"
+    expose:
+      - 8000
+
+  mysql:
+    image: mysql:5.7
+    container_name: mysql_app
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_HOST=mysql
+      - MYSQL_USER=newsimateb
+      - MYSQL_PASSWORD=newsimateb
+      - MYSQL_DATABASE=newsimateb
+      - MYSQL_ROOT_PASSWORD=newsimateb
+    volumes:
+      - database_mysql:/var/lib/mysql
+    networks:
+      - backend
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin_app
+    depends_on:
+      - mysql
+    environment:
+      - PMA_HOST=mysql # Note the "mysql". Must be the name of the what you used as the mysql service.
+      - PMA_USER=newsimateb
+      - PMA_PORT=newsimateb
+      - PMA_PASSWORD=newsimateb
+    ports:
+      - "9090:80"
+    expose:
+      - 9090
+    restart: always
+    networks:
+      - backend
+volumes:
+  api:
+  database_mysql:
+
+# Networks to be created to facilitate communication between containers
+networks:
+  backend:
+    driver: bridge

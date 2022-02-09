@@ -32,17 +32,17 @@ type PaymentStruct struct {
 }
 
 type CreatePaymentStruct struct {
-	UserID    int64   `json:"user_id"`
-	Income    bool    `json:"income"`
-	Amount    float64 `json:"amount"`
-	PayType   int     `json:"paytype"`
-	PaidFor   int     `json:"paid_for"`
-	TraceCode string  `json:"trace_code"`
-	CheckNum  string  `json:"check_num"`
-	CheckBank string  `json:"check_bank"`
-	CheckDate string  `json:"check_date"`
-	Info      string  `json:"info"`
-	PaidTo    string  `json:"paid_to"`
+	UserID    int64         `json:"user_id"`
+	Income    bool          `json:"income"`
+	Amount    float64       `json:"amount"`
+	PayType   int           `json:"paytype"`
+	PaidFor   int           `json:"paid_for"`
+	TraceCode string        `json:"trace_code"`
+	CheckNum  string        `json:"check_num"`
+	CheckBank string        `json:"check_bank"`
+	CheckDate *sql.NullTime `json:"check_date"`
+	Info      string        `json:"info"`
+	PaidTo    string        `json:"paid_to"`
 }
 
 type UpdatePaymentStruct struct {

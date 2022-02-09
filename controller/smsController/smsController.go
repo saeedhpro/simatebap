@@ -64,7 +64,7 @@ func (uc *SMSControllerStruct) GetListForAdmin(c *gin.Context) {
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
-	query += " limit 10 offset ?"
+	query += " ORDER BY s.id DESC limit 10 offset ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error())
@@ -151,7 +151,7 @@ func (uc *SMSControllerStruct) GetList(c *gin.Context) {
 	}
 	offset, err := strconv.Atoi(page)
 	offset = (offset - 1) * 10
-	query += " LIMIT 10 OFFSET ?"
+	query += " ORDER BY s.id DESC LIMIT 10 OFFSET ?"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error())

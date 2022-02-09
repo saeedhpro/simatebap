@@ -568,6 +568,11 @@ func (uc *UserControllerStruct) GetUserAppointmentList(c *gin.Context) {
 			return
 		}
 		appointment.Last = GetAppointmentLastPrescription(fmt.Sprintf("%d", appointment.ID))
+		appointment.PhotographyImages = GetResultImages(appointment.ID, "photo", c.Request.Host)
+		appointment.RadiologyImages = GetResultImages(appointment.ID, "radio", c.Request.Host)
+		if len(appointment.Logos) > 0 {
+			appointments = append(appointments, appointment)
+		}
 		appointments = append(appointments, appointment)
 	}
 	c.JSON(http.StatusOK, appointments)
@@ -716,7 +721,7 @@ func GetResultImages(id int64, prof string, host string) []string {
 	}
 	files, err := ioutil.ReadDir(location)
 	if err != nil {
-		log.Fatal(err, "system")
+		log.Println(err.Error(), "system")
 		return logos
 	}
 	for _, f := range files {

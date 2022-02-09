@@ -116,6 +116,8 @@ type UserAppointmentInfo struct {
 	LName              string           `json:"lname"`
 	Tel                string           `json:"tel"`
 	Logos              []string         `json:"logos"`
+	PhotographyImages  []string         `json:"photography_images"`
+	RadiologyImages    []string         `json:"radiology_images"`
 	Last               LastPrescription `json:"last"`
 }
 
@@ -136,6 +138,10 @@ type OperationInfo struct {
 	Tel               string                         `json:"tel"`
 	FileID            string                         `json:"file_id"`
 	Logo              string                         `json:"logo"`
+}
+type OperationPaginationInfo struct {
+	Data       []OperationInfo `json:"data"`
+	PagesCount int             `json:"pages_count"`
 }
 
 type QueDetail struct {

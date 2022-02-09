@@ -14,6 +14,7 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	appointment2 "gitlab.com/simateb-project/simateb-backend/repository/appointment"
 	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
+	"gitlab.com/simateb-project/simateb-backend/repository/organization"
 	"gitlab.com/simateb-project/simateb-backend/repository/user"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
 	"gitlab.com/simateb-project/simateb-backend/utils/errorsHandler"
@@ -44,6 +45,7 @@ type AppointmentControllerInterface interface {
 	Delete(c *gin.Context)
 	SearchAppointment(c *gin.Context)
 	AcceptAppointment(c *gin.Context)
+	CancelAppointment(c *gin.Context)
 	GetAppointmentByCode(c *gin.Context)
 	GetAppointmentAdmissions(c *gin.Context)
 	FinishAppointmentAdmissions(c *gin.Context)
@@ -67,9 +69,9 @@ func (uc *AppointmentControllerStruct) Create(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, errors)
 		return
 	}
-	PRndImg := helper.RandomString(6)
-	RRndImg := helper.RandomString(6)
-	LRndImg := helper.RandomString(6)
+	PRndImg := helper.RandomString(5)
+	RRndImg := helper.RandomString(5)
+	LRndImg := helper.RandomString(5)
 	CreateAppointmentQuery := "INSERT INTO `appointment`(`user_id`, `info`, `start_at`, `case_type`, `income`, `staff_id`, `is_vip`, `code`, `p_rnd_img`, `r_rnd_img`, `l_rnd_img`, `organization_id`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
 	stmt, err := repository.DBS.MysqlDb.Prepare(CreateAppointmentQuery)
 	if err != nil {
@@ -77,7 +79,6 @@ func (uc *AppointmentControllerStruct) Create(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	log.Println(createAppointmentRequest, "sa")
 	randomCode := helper.RandomString(6)
 	staff := auth.GetStaffUser(c)
 	_, err = stmt.Exec(
@@ -111,6 +112,18 @@ func (uc *AppointmentControllerStruct) SendResult(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, nil)
 		return
 	}
+	prof := "/photo"
+	switch staffOrg.ProfessionID {
+	case "3":
+		prof = "radio"
+		break
+	case "1":
+		prof = "photo"
+		break
+	case "2":
+		prof = "lab"
+		break
+	}
 	app, err := appointment.GetAppointmentById(id)
 	if err != nil {
 		log.Println(err.Error(), "get app")
@@ -118,14 +131,20 @@ func (uc *AppointmentControllerStruct) SendResult(c *gin.Context) {
 		return
 	}
 	price := app.Price
-	if orgWallet.Balance < price {
-		errorsHandler.GinErrorResponseHandler(c, nil)
-		return
-	}
-	res, _ := orgWallet.Decrease(price, false)
-	if !res {
-		errorsHandler.GinErrorResponseHandler(c, nil)
-		return
+	total := 0.0
+	if (prof == "radio" && app.RResultAt == nil) || (prof == "photo" && app.PResultAt == nil) || (prof == "lab" && app.LResultAt == nil) {
+		if price > 0 {
+			if orgWallet.Balance < price {
+				errorsHandler.GinErrorResponseHandler(c, nil)
+				return
+			}
+			res, _ := orgWallet.Decrease(price, false)
+			if !res {
+				errorsHandler.GinErrorResponseHandler(c, nil)
+				return
+			}
+			total = divideAmountForUsers(price, staffOrg.ID, app.ID, app.OrganizationID, staff.UserID)
+		}
 	}
 	_, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -143,21 +162,17 @@ func (uc *AppointmentControllerStruct) SendResult(c *gin.Context) {
 			return
 		}
 	}
-	prof := "/photo"
 	switch staffOrg.ProfessionID {
 	case "3":
 		newLocation += "/radio"
-		prof = "radio"
 		location += "/radio"
 		break
 	case "1":
 		newLocation += "/photo"
-		prof = "photo"
 		location += "/photo"
 		break
 	case "2":
 		newLocation += "/lab"
-		prof = "lab"
 		location += "/lab"
 		break
 	}
@@ -177,7 +192,8 @@ func (uc *AppointmentControllerStruct) SendResult(c *gin.Context) {
 		errorsHandler.GinErrorResponseHandler(c, err)
 		return
 	}
-	updateApp(id, prof)
+	total = price - total
+	updateApp(id, prof, price)
 	c.JSON(http.StatusAccepted, gin.H{
 		"name": fileName,
 		"id":   id,
@@ -186,17 +202,44 @@ func (uc *AppointmentControllerStruct) SendResult(c *gin.Context) {
 	})
 }
 
-func updateApp(id string, prof string) {
+func divideAmountForUsers(price float64, orgID int64, appID int64, appOrgID int64, staffID int64) float64 {
+	users := getEmployees(appOrgID)
+	total := 0.0
+	for i := 0; i < len(users); i++ {
+		total += addAmountToUser(users[i], price, orgID, appID, staffID)
+	}
+	return total
+}
+
+func addAmountToUser(user organization.OrgEmployeeCommission, price float64, orgID int64, appID int64, staffID int64) float64 {
+	if user.Commission == 0 {
+		return 0
+	}
+	amount := price / float64(user.Commission)
+	p, err := organization.AddTransfer(orgID, appID, user.UserID, staffID, amount)
+	if err != nil {
+		userWallet := wallet.GetWallet(user.UserID, "user")
+		userWallet.Increase(amount)
+	}
+	return p
+}
+
+func getEmployees(orgID int64) []organization.OrgEmployeeCommission {
+	list := organization.GetOrgEmployeeCommissionList(orgID)
+	return list
+}
+
+func updateApp(id string, prof string, price float64) {
 	query := "UPDATE `appointment` SET "
 	switch prof {
 	case "radio":
-		query += "`r_result_at`= ? "
+		query += "`r_result_at`= ? , `price` = ?"
 		break
 	case "photo":
-		query += "`p_result_at`= ? "
+		query += "`p_result_at`= ? , `price` = ?"
 		break
 	case "lab":
-		query += "`l_rnd_img`= ? "
+		query += "`l_rnd_img`= ? , `price` = ? "
 		break
 	}
 	query += " WHERE id = ?"
@@ -206,7 +249,7 @@ func updateApp(id string, prof string) {
 		log.Println(err.Error())
 		return
 	}
-	_, err = stmt.Exec(t, id)
+	_, err = stmt.Exec(t, price, id)
 	if err != nil {
 		log.Println(err.Error())
 		return
@@ -335,6 +378,7 @@ func (uc *AppointmentControllerStruct) GetAppointmentList(c *gin.Context) {
 	status := c.Query("status")
 	vip := c.Query("vip")
 	q := c.Query("q")
+	paginated := appointment.OperationPaginationInfo{}
 	var values []interface{}
 	if status == "" {
 		log.Println("status is needed!")
@@ -346,7 +390,18 @@ func (uc *AppointmentControllerStruct) GetAppointmentList(c *gin.Context) {
 	staffUser := auth.GetStaffUser(c)
 	organizationID := staffUser.OrganizationID
 	values = append(values, organizationID)
-	query := "SELECT appointment.id id, appointment.user_id user_id, appointment.start_at start_at, ifnull(appointment.info, '') info, appointment.income, ifnull(appointment.case_type, '') case_type, ifnull(appointment.code, '') code, appointment.photography_status photography_status, appointment.radiology_status radiology_status, appointment.status status, ifnull(user.fname, '') fname, ifnull(user.fname, '') lname, ifnull(user.tel, '') tel, ifnull(user.file_id, '') file_id, ifnull(user.logo, '') logo FROM `appointment` LEFT JOIN `user` on `appointment`.`user_id` = `user`.id WHERE appointment.organization_id = ? "
+	query := "SELECT appointment.id id, appointment.user_id user_id, appointment.start_at start_at, ifnull(appointment.info, '') info, appointment.income, ifnull(appointment.case_type, '') case_type, ifnull(appointment.code, '') code, appointment.photography_status photography_status, appointment.radiology_status radiology_status, appointment.status status, ifnull(user.fname, '') fname, ifnull(user.fname, '') lname, ifnull(user.tel, '') tel, ifnull(user.file_id, '') file_id, ifnull(user.logo, '') logo FROM `appointment` LEFT JOIN `user` on `appointment`.`user_id` = `user`.id "
+	staffOrg := organizationController.GetOrganization(fmt.Sprintf("%d", organizationID))
+	prof := staffOrg.ProfessionID
+	if prof == "1" {
+		query += " WHERE appointment.photography_id = ? "
+	} else if prof == "2" {
+		query += " WHERE appointment.laboratory_id = ? "
+	} else if prof == "3" {
+		query += " WHERE appointment.radiology_id = ? "
+	} else {
+		query += " WHERE appointment.organization_id = ? "
+	}
 	if startAt != "" && startAt != "null" && startAt != "undefined" {
 		query += " AND appointment.start_at >= ? "
 		values = append(values, startAt)
@@ -373,7 +428,16 @@ func (uc *AppointmentControllerStruct) GetAppointmentList(c *gin.Context) {
 	if q != "" && q != "null" && q != "undefined" {
 		query += " AND (user.fname LIKE '%" + q + "%' OR user.lname LIKE '%" + q + "%' OR appointment.code LIKE '%" + q + "%')"
 	}
-	query += " ORDER BY `id` DESC"
+	query += " ORDER BY `appointment`.`id` DESC"
+	page := c.Query("page")
+	count := 0
+	if page != "" && page != "null" && page != "undefined" {
+		query += " LIMIT 10 OFFSET ?"
+		offset, _ := strconv.Atoi(page)
+		offset = (offset - 1) * 10
+		values = append(values, offset)
+		count = getAppointmentCount(startAt, endAt, status, vip, q, organizationID, prof)
+	}
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)
 	if err != nil {
 		log.Println(err.Error(), "first")
@@ -415,8 +479,66 @@ func (uc *AppointmentControllerStruct) GetAppointmentList(c *gin.Context) {
 		operation.User, _ = user.GetUserByID(operation.UserID)
 		operations = append(operations, operation)
 	}
-	c.JSON(http.StatusOK, operations)
+	paginated.Data = operations
+	paginated.PagesCount = count
+	c.JSON(http.StatusOK, paginated)
 }
+
+func getAppointmentCount(startAt string, endAt string, status string, vip string, q string, organizationID int64, prof string) int {
+	count := 0
+	var values []interface{}
+	values = append(values, organizationID)
+	query := "SELECT COUNT(*) count FROM `appointment` LEFT JOIN `user` on `appointment`.`user_id` = `user`.id "
+	if prof == "1" {
+		query += " WHERE appointment.photography_id = ? "
+	} else if prof == "2" {
+		query += " WHERE appointment.laboratory_id = ? "
+	} else if prof == "3" {
+		query += " WHERE appointment.radiology_id = ? "
+	} else {
+		query += " WHERE appointment.organization_id = ? "
+	}
+	if startAt != "" && startAt != "null" && startAt != "undefined" {
+		query += " AND appointment.start_at >= ? "
+		values = append(values, startAt)
+	}
+	if endAt != "" && endAt != "null" && endAt != "undefined" {
+		query += " AND appointment.start_at <= ? "
+		values = append(values, endAt)
+	}
+	query += " AND appointment.status in ("
+	ss := strings.Split(status, ",")
+	for i := 0; i < len(ss); i++ {
+		values = append(values, ss[i])
+		if i != len(ss)-1 {
+			query += "?,"
+		} else {
+			query += "?"
+		}
+	}
+	query += ")"
+	if vip != "" {
+		query += " AND vip = ? "
+		values = append(values, vip)
+	}
+	if q != "" && q != "null" && q != "undefined" {
+		query += " AND (user.fname LIKE '%" + q + "%' OR user.lname LIKE '%" + q + "%' OR appointment.code LIKE '%" + q + "%')"
+	}
+	query += " ORDER BY `appointment`.`id` DESC"
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	if err != nil {
+		log.Println(err.Error(), "first")
+		return count
+	}
+	result := stmt.QueryRow(values...)
+	err = result.Scan(&count)
+	if err != nil {
+		log.Println(err.Error(), "count")
+		return count
+	}
+	return count
+}
+
 func (uc *AppointmentControllerStruct) GetRadiosAppointmentList(c *gin.Context) {
 	var values []interface{}
 	organizationID := c.Param("id")
@@ -1064,6 +1186,21 @@ func (uc *AppointmentControllerStruct) AcceptAppointment(c *gin.Context) {
 	c.JSON(200, status)
 }
 
+func (uc *AppointmentControllerStruct) CancelAppointment(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		return
+	}
+	staff := auth.GetStaffUser(c)
+	status := cancelAppointment(id, staff.UserID)
+	c.JSON(200, status)
+}
+
+func cancelAppointment(appID string, staffID int64) bool {
+
+	return true
+}
+
 func acceptAppointment(id string, code string, price float64, request appointment.AcceptAppointmentRequest) bool {
 	query := "UPDATE `appointment` SET `status`= ?, `photography_cases`= ? ,`radiology_cases`= ? ," +
 		"`last_photography_cases`= ? ,`last_radiology_cases`= ? ,`prescription`= ? ," +
@@ -1073,12 +1210,14 @@ func acceptAppointment(id string, code string, price float64, request appointmen
 	if err != nil {
 		return false
 	}
+	photoCases := strings.Join(request.PhotographyCases, ",")
+	radioCases := strings.Join(request.RadiologyCases, ",")
 	_, err = stmt.Exec(
 		2,
-		strings.Join(request.PhotographyCases, ","),
-		strings.Join(request.RadiologyCases, ","),
-		strings.Join(request.PhotographyCases, ","),
-		strings.Join(request.RadiologyCases, ","),
+		photoCases,
+		radioCases,
+		photoCases,
+		radioCases,
 		request.Prescription,
 		request.FuturePrescription,
 		request.PhotographyMsg,
@@ -1086,11 +1225,11 @@ func acceptAppointment(id string, code string, price float64, request appointmen
 		request.RadiologyID,
 		request.PhotographyID,
 		code,
-		id,
 		price,
+		id,
 	)
 	if err != nil {
-		log.Println(err.Error())
+		log.Println(err.Error(), "accept udpate")
 		return false
 	}
 	if request.Prescription != "" || request.FuturePrescription != "" {

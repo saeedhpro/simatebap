@@ -12,6 +12,7 @@ import (
 	"gitlab.com/simateb-project/simateb-backend/repository"
 	mysqlQuery "gitlab.com/simateb-project/simateb-backend/repository/mysqlQuery/auth"
 	report2 "gitlab.com/simateb-project/simateb-backend/repository/report"
+	"gitlab.com/simateb-project/simateb-backend/repository/transfer"
 	"gitlab.com/simateb-project/simateb-backend/repository/vip"
 	"gitlab.com/simateb-project/simateb-backend/repository/wallet"
 	"gitlab.com/simateb-project/simateb-backend/utils/auth"
@@ -36,6 +37,7 @@ type OrganizationControllerInterface interface {
 	GetList(c *gin.Context)
 	GetListAll(c *gin.Context)
 	GetOrganizationAppointments(c *gin.Context)
+	GetOrganizationTransferList(c *gin.Context)
 	GetOrganizationReports(c *gin.Context)
 	UploadOrganizationImage(c *gin.Context)
 	UpdateOrganizationAbout(c *gin.Context)
@@ -582,6 +584,21 @@ func (oc *OrganizationControllerStruct) GetOrganizationAbout(c *gin.Context) {
 	c.JSON(http.StatusOK, image)
 }
 
+func (oc *OrganizationControllerStruct) GetOrganizationTransferList(c *gin.Context) {
+	id := c.Param("id")
+	page := c.Query("page")
+	if id == "" {
+		return
+	}
+	if page == "" {
+		page = "1"
+	}
+	tid, _ := strconv.ParseInt(id, 10, 64)
+	p, _ := strconv.ParseInt(page, 10, 64)
+	data := transfer.GetOrganizationTransfers(tid, p)
+	c.JSON(http.StatusOK, data)
+}
+
 func (oc *OrganizationControllerStruct) GetOrganizationAppointments(c *gin.Context) {
 	query := "SELECT appointment.id id, appointment.user_id user_id, appointment.created_at created_at, ifnull(appointment.info, '') info, appointment.staff_id staff_id, appointment.start_at start_at, appointment.end_at end_at, appointment.status status, ifnull(appointment.director_id, -1) director_id, ifnull(appointment.updated_at, null) updated_at, appointment.income, ifnull(appointment.subject, '') subject, ifnull(appointment.case_type, '') case_type, ifnull(appointment.laboratory_cases, '') laboratory_cases, ifnull(appointment.photography_cases, '') photography_cases, ifnull(appointment.radiology_cases, '') radiology_cases, ifnull(appointment.prescription, '') prescription, ifnull(appointment.future_prescription, '') future_prescription, ifnull(appointment.laboratory_msg, '') laboratory_msg, ifnull(appointment.photography_msg, '') photography_msg, ifnull(appointment.radiology_msg, '') radiology_msg, appointment.organization_id, ifnull(appointment.director_id, -1) laboratory_id, ifnull(appointment.photography_id, -1) photography_id, ifnull(appointment.radiology_id, -1) radiology_id, appointment.l_admission_at, appointment.r_admission_at, appointment.p_admission_at, appointment.l_result_at, appointment.r_result_at, appointment.p_result_at, ifnull(appointment.l_rnd_img, '') l_rnd_img, ifnull(appointment.r_rnd_img, '') r_rnd_img, ifnull(appointment.p_rnd_img, '') p_rnd_img, appointment.l_imgs, appointment.r_imgs, appointment.p_imgs, ifnull(appointment.code, '') code, appointment.is_vip, ifnull(appointment.vip_introducer, 0) vip_introducer, appointment.absence, ifnull(user.file_id, '') file_id, ifnull(user.fname, '') fname, ifnull(user.lname, '') lname, ifnull(user.tel, '') tel FROM appointment LEFT JOIN user on appointment.user_id = user.id WHERE appointment.organization_id = ? "
 	orgID := c.Param("id")
@@ -696,20 +713,41 @@ func (oc *OrganizationControllerStruct) GetOrganizationAppointments(c *gin.Conte
 
 func (oc *OrganizationControllerStruct) GetOrganizationReports(c *gin.Context) {
 	report := report2.Report{}
-	getAbundanceReport(&report)
-	getGenderReport(&report)
+	staffUser := auth.GetStaffUser(c)
+	getAbundanceReport(&report, staffUser.OrganizationID)
+	getGenderReport(&report, staffUser.OrganizationID)
+	//getCaseReport(&report, staffUser.OrganizationID)
 	c.JSON(http.StatusOK, report)
 }
 
-func getAbundanceReport(report *report2.Report)  {
+func getAbundanceReport(report *report2.Report, orgID int64) {
 	s1 := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(s1)
 	for i := 0; i < 6; i++ {
-		report.Abundance = append(report.Abundance, (r1.Intn(25) * 3)+ 10)
+		report.Abundance = append(report.Abundance, (r1.Intn(25)*3)+10)
 	}
 }
 
-func getGenderReport(report *report2.Report)  {
+func getCaseReport(report *report2.Report, orgID int64) {
+	cases := getOrgCases(orgID)
+	caseList := []report2.Case{}
+	for i := 0; i < 6; i++ {
+		caseList = append(caseList, getCaseSum(cases[i]))
+	}
+	report.Case = caseList
+}
+
+func getCaseSum(name string) report2.Case {
+	c := report2.Case{}
+	return c
+}
+
+func getOrgCases(orgID int64) []string {
+	caseList := []string{}
+	return caseList
+}
+
+func getGenderReport(report *report2.Report, orgID int64) {
 	gender := report2.Gender{}
 	query := "SELECT COUNT(*) male FROM `user` WHERE `gender` = 'MALE' AND `user_group_id` = 1"
 	stmt, err := repository.DBS.MysqlDb.Prepare(query)

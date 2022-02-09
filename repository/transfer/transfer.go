@@ -72,6 +72,48 @@ func GetUserTransfers(id int64, page int64) *TransferPagination {
 	return &paginated
 }
 
+func GetOrganizationTransfers(id int64, page int64) *TransferPagination {
+	query := "SELECT id, organization_id, to_id, staff_id, amount, created_at, status, appointment_id FROM `transfer` WHERE `organization_id` = ? LIMIT 10 OFFSET ? "
+	stmt, err := repository.DBS.MysqlDb.Prepare(query)
+	paginated := TransferPagination{}
+	if err != nil {
+		log.Println(err.Error())
+		return &paginated
+	}
+	rows, err := stmt.Query(id, page - 1)
+	if err != nil {
+		log.Println(err.Error())
+		return &paginated
+	}
+	transferList := []Transfer{}
+	transfer := Transfer{}
+	for rows.Next() {
+		err = rows.Scan(
+			&transfer.ID,
+			&transfer.OrganizationID,
+			&transfer.ToID,
+			&transfer.StaffID,
+			&transfer.Amount,
+			&transfer.CreatedAt,
+			&transfer.Status,
+			&transfer.AppointmentID,
+		)
+		if err != nil {
+			log.Println(err.Error())
+			return &paginated
+		}
+		transfer.Organization, _ = GetOrganizationByID(transfer.OrganizationID)
+		transfer.To = GetUserByID(transfer.ToID)
+		transfer.Staff = GetUserByID(transfer.StaffID)
+		transfer.Appointment, _ = GetAppointmentByID(transfer.AppointmentID)
+		transferList = append(transferList, transfer)
+	}
+	count := GetTransferByIDCount(id)
+	paginated.Data = transferList
+	paginated.PagesCount = count
+	return &paginated
+}
+
 func GetTransferByIDCount(id int64) int64 {
 	query := "SELECT COUNT(*) count FROM transfer WHERE to_id = ? "
 	var count int64 = 0
