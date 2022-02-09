@@ -12,11 +12,10 @@ services:
     networks:
       - backend
     environment:
-      - MYSQL_ROOT_HOST=mysql
-      - MYSQL_USER=newsimateb
-      - MYSQL_PASSWORD=newsimateb
-      - MYSQL_DATABASE=newsimateb
-      - MYSQL_ROOT_PASSWORD=newsimateb
+      - DB_HOST="mysql:3307"
+      - DB_USERNAME=newsimateb
+      - DB_PASSWORD=newsimateb
+      - DB_SCHEMA=newsimateb
     ports:
       - "8000:8000"
     expose:
