@@ -57,6 +57,7 @@ services:
 volumes:
   api:
   database_mysql:
+  images:
 
 # Networks to be created to facilitate communication between containers
 networks:
