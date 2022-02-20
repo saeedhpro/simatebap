@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"gitlab.com/simateb-project/simateb-backend/repository/env"
 	"log"
 )
 
@@ -28,10 +27,10 @@ func Init() {
 }
 
 func mysqlInit() {
-	username := env.GetDotEnvVariable("DB_USERNAME")
-	password := env.GetDotEnvVariable("DB_PASSWORD")
-	schema := env.GetDotEnvVariable("DB_SCHEMA")
-	host := env.GetDotEnvVariable("DB_HOST")
+	username := "admin_simateb"
+	password := "admin_simateb"
+	schema := "admin_simateb"
+	host := "localhost:3306"
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=true", username, password, host, schema)
 	db, err := sql.Open("mysql", dataSourceName)
 
