@@ -27,7 +27,7 @@ func Init() {
 }
 
 func mysqlInit() {
-	username := "admin_simateb"
+	username := "root"
 	password := "admin_simateb"
 	schema := "admin_simateb"
 	host := "mysql:3306"
