@@ -12,12 +12,12 @@ services:
     networks:
       - backend
     environment:
-      - DB_HOST="mysql:3307"
+      - DB_HOST="mysql:3306"
       - DB_USERNAME=newsimateb
       - DB_PASSWORD=newsimateb
       - DB_SCHEMA=newsimateb
     ports:
-      - "8001:8000"
+      - "8000:8000"
     expose:
       - 8000
 
@@ -28,10 +28,10 @@ services:
       - "3307:3306"
     environment:
       - MYSQL_ROOT_HOST=mysql
-      - MYSQL_USER=newsimateb
-      - MYSQL_PASSWORD=newsimateb
-      - MYSQL_DATABASE=newsimateb
-      - MYSQL_ROOT_PASSWORD=newsimateb
+      - MYSQL_USER=admin_simateb
+      - MYSQL_PASSWORD=admin_simateb
+      - MYSQL_DATABASE=admin_simateb
+      - MYSQL_ROOT_PASSWORD=admin_simateb
     volumes:
       - database_mysql:/var/lib/mysql
     networks:
@@ -44,9 +44,9 @@ services:
       - mysql
     environment:
       - PMA_HOST=mysql # Note the "mysql". Must be the name of the what you used as the mysql service.
-      - PMA_USER=newsimateb
-      - PMA_PORT=newsimateb
-      - PMA_PASSWORD=newsimateb
+      - PMA_USER=admin_simateb
+      - PMA_PORT=admin_simateb
+      - PMA_PASSWORD=admin_simateb
     ports:
       - "9090:80"
     expose:
