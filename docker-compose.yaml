@@ -33,7 +33,7 @@ services:
       - MYSQL_DATABASE=admin_simateb
       - MYSQL_ROOT_PASSWORD=admin_simateb
     volumes:
-      - database_mysql:/var/lib/mysql
+      - ./database_mysql:/var/lib/mysql
     networks:
       - backend
 
