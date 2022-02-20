@@ -30,7 +30,7 @@ func mysqlInit() {
 	username := "admin_simateb"
 	password := "admin_simateb"
 	schema := "admin_simateb"
-	host := "mysql:3306"
+	host := "localhost:3306"
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=true", username, password, host, schema)
 	db, err := sql.Open("mysql", dataSourceName)
 
