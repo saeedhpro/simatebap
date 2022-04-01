@@ -27,9 +27,9 @@ func Init() {
 }
 
 func mysqlInit() {
-	username := "admin_simateb"
-	password := "admin_simateb"
-	schema := "admin_simateb"
+	username := "doc"
+	password := "sdf345kddf@#$@#dsf214"
+	schema := "newsimateb"
 	host := "localhost:3306"
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=true", username, password, host, schema)
 	db, err := sql.Open("mysql", dataSourceName)
